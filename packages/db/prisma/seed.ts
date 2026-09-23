@@ -1,6 +1,17 @@
 import { PrismaClient, Algorithm } from "@prisma/client";
+import crypto from "crypto";
 
 const prisma = new PrismaClient();
+
+function hashPassword(password: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const salt = crypto.randomBytes(16).toString("hex");
+    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
+      if (err) return reject(err);
+      resolve(`${salt}:${derivedKey.toString("hex")}`);
+    });
+  });
+}
 
 const sampleWords = [
   {
@@ -63,17 +74,22 @@ const sampleWords = [
 async function main() {
   console.log("Seeding development database...");
 
-  // 1. Create or get development user
+  const defaultPasswordHash = await hashPassword("password123");
+
+  // 1. Create or get development user with password
   const devUser = await prisma.user.upsert({
     where: { email: "dev@rosp.local" },
-    update: {},
+    update: {
+      passwordHash: defaultPasswordHash,
+    },
     create: {
       email: "dev@rosp.local",
       name: "Development User",
+      passwordHash: defaultPasswordHash,
       image: "https://avatar.vercel.sh/dev@rosp.local",
     },
   });
-  console.log(`Development user ready: ${devUser.id} (${devUser.email})`);
+  console.log(`Development user ready: ${devUser.id} (${devUser.email}) with password "password123"`);
 
   // 2. Create or get default WordList
   let wordList = await prisma.wordList.findFirst({
