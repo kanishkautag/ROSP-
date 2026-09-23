@@ -1,0 +1,19 @@
+{
+  "name": "rosp-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @rosp/web dev",
+    "build": "pnpm --filter @rosp/shared build && pnpm --filter @rosp/db build && pnpm --filter @rosp/web build",
+    "lint": "pnpm --filter @rosp/web lint",
+    "typecheck": "pnpm -r run typecheck",
+    "db:generate": "pnpm --filter @rosp/db db:generate",
+    "db:migrate": "pnpm --filter @rosp/db db:migrate",
+    "db:push": "pnpm --filter @rosp/db db:push",
+    "db:seed": "pnpm --filter @rosp/db db:seed",
+    "db:studio": "pnpm --filter @rosp/db db:studio"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

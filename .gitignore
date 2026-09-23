@@ -1,0 +1,45 @@
+# Node modules
+node_modules/
+.pnpm-store/
+
+# Next.js build output
+.next/
+out/
+
+# Production build artifacts
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# Debug and task logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Prisma generated artifacts
+prisma/*.db
+prisma/*.db-journal
+
+# Turbo / Cache
+.turbo/
+.cache/
