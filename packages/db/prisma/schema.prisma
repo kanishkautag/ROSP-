@@ -1,0 +1,200 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Algorithm {
+  SM2
+  FSRS
+}
+
+enum ExerciseType {
+  FILL_BLANK
+  MULTIPLE_CHOICE
+  SENTENCE_CONSTRUCTION
+}
+
+enum LLMProvider {
+  OLLAMA
+  GROQ
+}
+
+model User {
+  id             String          @id @default(uuid())
+  email          String          @unique
+  name           String?
+  image          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  accounts       Account[]
+  sessions       Session[]
+  wordLists      WordList[]
+  userWords      UserWord[]
+  reviewAttempts ReviewAttempt[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refreshToken      String? @map("refresh_token")
+  accessToken       String? @map("access_token")
+  expiresAt         Int?    @map("expires_at")
+  tokenType         String? @map("token_type")
+  scope             String?
+  idToken           String? @map("id_token")
+  sessionState      String? @map("session_state")
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model WordList {
+  id          String         @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       WordListItem[]
+
+  @@index([userId])
+  @@map("word_lists")
+}
+
+model VocabularyWord {
+  id            String         @id @default(uuid())
+  word          String
+  language      String         @default("en")
+  meaning       String
+  example       String?
+  partOfSpeech  String?
+  cefrLevel     String?
+  frequency     Float?
+  frequencyRank Int?
+  source        String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  listItems     WordListItem[]
+  userWords     UserWord[]
+
+  @@index([word])
+  @@index([language])
+  @@map("vocabulary_words")
+}
+
+model WordListItem {
+  id               String         @id @default(uuid())
+  wordListId       String
+  vocabularyWordId String
+  createdAt        DateTime       @default(now())
+  wordList         WordList       @relation(fields: [wordListId], references: [id], onDelete: Cascade)
+  vocabularyWord   VocabularyWord @relation(fields: [vocabularyWordId], references: [id], onDelete: Cascade)
+
+  @@unique([wordListId, vocabularyWordId])
+  @@index([wordListId])
+  @@index([vocabularyWordId])
+  @@map("word_list_items")
+}
+
+model UserWord {
+  id               String          @id @default(uuid())
+  userId           String
+  vocabularyWordId String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabularyWord   VocabularyWord  @relation(fields: [vocabularyWordId], references: [id], onDelete: Cascade)
+  learningState    LearningState?
+  reviewAttempts   ReviewAttempt[]
+
+  @@unique([userId, vocabularyWordId])
+  @@index([userId])
+  @@index([vocabularyWordId])
+  @@map("user_words")
+}
+
+model LearningState {
+  id             String    @id @default(uuid())
+  userWordId     String    @unique
+  algorithm      Algorithm @default(SM2)
+  // SM2 fields
+  repetitions    Int?      @default(0)
+  interval       Float?    @default(0)
+  easeFactor     Float?    @default(2.5)
+  // FSRS fields
+  difficulty     Float?
+  stability      Float?
+  retrievability Float?
+  // Scheduling dates
+  lastReviewedAt DateTime?
+  nextReviewAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  userWord       UserWord  @relation(fields: [userWordId], references: [id], onDelete: Cascade)
+
+  @@index([userWordId])
+  @@index([nextReviewAt])
+  @@map("learning_states")
+}
+
+model ReviewAttempt {
+  id                 String     @id @default(uuid())
+  userId             String
+  userWordId         String
+  rating             Int
+  correct            Boolean
+  reviewedAt         DateTime   @default(now())
+  previousInterval   Float?
+  newInterval        Float?
+  previousEaseFactor Float?
+  newEaseFactor      Float?
+  createdAt          DateTime   @default(now())
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userWord           UserWord   @relation(fields: [userWordId], references: [id], onDelete: Cascade)
+  exercises          Exercise[]
+
+  @@index([userId])
+  @@index([reviewedAt])
+  @@index([userWordId])
+  @@map("review_attempts")
+}
+
+model Exercise {
+  id              String        @id @default(uuid())
+  reviewAttemptId String?
+  type            ExerciseType
+  question        String
+  response        String?
+  answer          String
+  explanation     String?
+  provider        LLMProvider
+  model           String
+  createdAt       DateTime      @default(now())
+  reviewAttempt   ReviewAttempt? @relation(fields: [reviewAttemptId], references: [id], onDelete: SetNull)
+
+  @@index([reviewAttemptId])
+  @@map("exercises")
+}
