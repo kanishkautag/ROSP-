@@ -67,11 +67,11 @@ export default function LoginPage() {
             <Brain className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            {mode === "login" ? "Sign In to ROSP" : "Create ROSP Account"}
+            {mode === "login" ? "Sign In to LinguaPulse" : "Create LinguaPulse Account"}
           </h1>
           <p className="text-xs text-slate-400 mt-1 max-w-xs">
             {mode === "login"
-              ? "Access your spaced repetition learning vault and practice with AI."
+              ? "Access your language learning vault and practice with AI."
               : "Start mastering languages with intelligent spaced repetition."}
           </p>
         </div>
