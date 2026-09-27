@@ -12,15 +12,17 @@ export interface LLMConfig {
 
 export function getLLMConfig(): LLMConfig {
   const providerEnv = process.env.LLM_PROVIDER?.toUpperCase();
-  const provider =
-    providerEnv === "GROQ" ? LLMProviderType.GROQ : LLMProviderType.OLLAMA;
+  const groqKey = process.env.GROQ_API_KEY || "";
 
-  if (provider === LLMProviderType.GROQ) {
+  // If GROQ_API_KEY is present or LLM_PROVIDER is explicitly GROQ, use Groq
+  const useGroq = providerEnv === "GROQ" || (groqKey.length > 0 && providerEnv !== "OLLAMA");
+
+  if (useGroq) {
     return {
       provider: LLMProviderType.GROQ,
-      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      model: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
       baseUrl: "https://api.groq.com/openai/v1",
-      apiKey: process.env.GROQ_API_KEY || "",
+      apiKey: groqKey,
     };
   }
 

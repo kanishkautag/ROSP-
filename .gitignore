@@ -43,3 +43,4 @@ prisma/*.db-journal
 # Turbo / Cache
 .turbo/
 .cache/
+*.tsbuildinfo

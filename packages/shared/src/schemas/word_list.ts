@@ -19,3 +19,19 @@ export const AddWordsToListSchema = z.object({
 });
 
 export type AddWordsToListInput = z.infer<typeof AddWordsToListSchema>;
+
+export const MoveWordSchema = z.object({
+  wordId: z.string().uuid("Invalid word ID"),
+  sourceListId: z.string().uuid("Invalid source list ID"),
+  targetListId: z.string().uuid("Invalid target list ID"),
+});
+
+export type MoveWordInput = z.infer<typeof MoveWordSchema>;
+
+export const MergeListsSchema = z.object({
+  sourceListId: z.string().uuid("Invalid source list ID"),
+  targetListId: z.string().uuid("Invalid target list ID"),
+  deleteSource: z.boolean().default(true),
+});
+
+export type MergeListsInput = z.infer<typeof MergeListsSchema>;

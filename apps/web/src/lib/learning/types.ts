@@ -1,5 +1,14 @@
 export type AlgorithmName = "SM2" | "FSRS";
 
+export const Rating = {
+  AGAIN: 1,
+  HARD: 2,
+  GOOD: 3,
+  EASY: 4,
+} as const;
+
+export type RatingType = (typeof Rating)[keyof typeof Rating];
+
 export interface LearningStateData {
   repetitions?: number | null;
   interval?: number | null;
@@ -12,17 +21,17 @@ export interface LearningStateData {
 }
 
 export interface ReviewRatingInput {
-  rating: number; // typically 1 (Again/Hard) to 4-5 (Easy/Perfect)
+  rating: number; // 1: Again, 2: Hard, 3: Good, 4: Easy
   reviewedAt?: Date;
 }
 
 export interface ScheduleResult {
   repetitions: number;
   interval: number; // in days
-  easeFactor?: number;
-  difficulty?: number;
-  stability?: number;
-  retrievability?: number;
+  easeFactor: number;
+  difficulty: number;
+  stability: number;
+  retrievability: number;
   lastReviewedAt: Date;
   nextReviewAt: Date;
 }

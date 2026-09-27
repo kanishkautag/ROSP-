@@ -12,7 +12,10 @@
   "dependencies": {
     "@rosp/db": "workspace:*",
     "@rosp/shared": "workspace:*",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.2",
     "clsx": "^2.1.1",
+    "jszip": "^3.10.2",
     "lucide-react": "^0.475.0",
     "next": "^14.2.24",
     "react": "^18.3.1",
@@ -21,6 +24,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/jszip": "^3.4.1",
     "@types/node": "^22.13.4",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

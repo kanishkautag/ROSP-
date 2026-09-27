@@ -66,9 +66,21 @@ export async function processReviewSubmission(
       previousInterval: currentState?.interval ?? 0,
       newInterval: scheduleResult.interval,
       previousEaseFactor: currentState?.easeFactor ?? 2.5,
-      newEaseFactor: scheduleResult.easeFactor ?? 2.5,
+      newEaseFactor: scheduleResult.easeFactor,
     },
   });
+
+  // Link exercise if provided
+  if (input.exerciseId) {
+    try {
+      await prisma.exercise.update({
+        where: { id: input.exerciseId },
+        data: { reviewAttemptId: reviewAttempt.id },
+      });
+    } catch {
+      // Non-fatal if exercise not found
+    }
+  }
 
   // Update learning state
   const updatedState = await prisma.learningState.upsert({
@@ -100,5 +112,6 @@ export async function processReviewSubmission(
   return {
     reviewAttempt,
     learningState: updatedState,
+    scheduleResult,
   };
 }

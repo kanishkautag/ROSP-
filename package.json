@@ -11,9 +11,11 @@
     "db:migrate": "pnpm --filter @rosp/db db:migrate",
     "db:push": "pnpm --filter @rosp/db db:push",
     "db:seed": "pnpm --filter @rosp/db db:seed",
-    "db:studio": "pnpm --filter @rosp/db db:studio"
+    "db:studio": "pnpm --filter @rosp/db db:studio",
+    "vocab:ingest": "tsx scripts/vocabulary/ingest.ts"
   },
   "devDependencies": {
+    "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   }
 }
