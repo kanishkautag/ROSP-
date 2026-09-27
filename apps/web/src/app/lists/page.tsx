@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Folder, Plus, ArrowLeft, Upload, Trash2, ArrowRightLeft,
-  ChevronDown, ChevronUp, Play, Sparkles, BookOpen, AlertCircle, Check, Volume2, Search, X
+  ChevronDown, ChevronUp, Play, Sparkles, BookOpen, AlertCircle, Check, Volume2, Search, X, Globe
 } from "lucide-react";
 import { AnkiImportModal } from "@/components/anki_import_modal";
 import { speakWord } from "@/lib/utils/tts";
@@ -63,6 +63,31 @@ export default function WordListsPage() {
 
   const speak = (text: string) => {
     speakWord(text);
+  };
+
+  const [lookingUpOnline, setLookingUpOnline] = useState(false);
+
+  const handleLookupOnlineForList = async () => {
+    if (!searchQuery.trim()) return;
+    setLookingUpOnline(true);
+    try {
+      const res = await fetch(`/api/dictionary/lookup?query=${encodeURIComponent(searchQuery.trim())}`);
+      const data = await res.json();
+      if (res.ok && data.found && data.entry) {
+        setCustomWord(data.entry.word);
+        setCustomMeaning(data.entry.meaning);
+        setCustomExample(data.entry.example || "");
+        if (data.entry.partOfSpeech) setCustomPos(data.entry.partOfSpeech);
+        if (data.entry.cefrLevel) setCustomCefr(data.entry.cefrLevel);
+        setAddWordTab("custom");
+      } else {
+        setMessage({ text: data.message || "Word not found in open dictionary.", type: "error" });
+      }
+    } catch {
+      setMessage({ text: "Failed to look up word online.", type: "error" });
+    } finally {
+      setLookingUpOnline(false);
+    }
   };
 
   const handleSearchCatalog = async (q: string) => {
@@ -806,16 +831,25 @@ export default function WordListsPage() {
                       </div>
                     ))
                   ) : searchQuery.trim() ? (
-                    <div className="text-center py-6 text-slate-400 text-xs">
-                      No matching words found in catalog.{" "}
+                    <div className="text-center py-6 text-slate-400 text-xs space-y-3">
+                      <p>No matching words found in local catalog.</p>
+                      <button
+                        type="button"
+                        onClick={handleLookupOnlineForList}
+                        disabled={lookingUpOnline}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold flex items-center gap-1.5 mx-auto shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+                      >
+                        <Globe className="h-3.5 w-3.5" />
+                        {lookingUpOnline ? "Looking up Oxford & AI..." : `Look up "${searchQuery.trim()}" in Oxford & AI`}
+                      </button>
                       <button
                         onClick={() => {
                           setAddWordTab("custom");
                           setCustomWord(searchQuery.trim());
                         }}
-                        className="text-indigo-400 underline ml-1 cursor-pointer"
+                        className="text-indigo-400 underline block mx-auto cursor-pointer"
                       >
-                        Create &quot;{searchQuery.trim()}&quot; as custom word
+                        Create &quot;{searchQuery.trim()}&quot; as manual custom word
                       </button>
                     </div>
                   ) : (
