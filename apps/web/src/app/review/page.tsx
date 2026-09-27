@@ -8,6 +8,7 @@ import {
   Check, Eye, EyeOff, Bot, MessageSquare, SkipForward
 } from "lucide-react";
 import { AiTutorDrawer } from "@/components/ai_tutor_drawer";
+import { speakWord } from "@/lib/utils/tts";
 
 interface VocabularyWord {
   id: string;
@@ -85,17 +86,6 @@ export default function ReviewSessionPage() {
   }, []);
 
   const currentCard = reviews[currentIndex];
-
-  // Text to Speech
-  const speakWord = (text: string) => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-US";
-      utterance.rate = 0.9;
-      window.speechSynthesis.speak(utterance);
-    }
-  };
 
   // Fetch or generate exercise whenever current card changes
   useEffect(() => {
@@ -337,8 +327,8 @@ export default function ReviewSessionPage() {
               {currentCard?.vocabularyWord.word}
             </h2>
             <button
-              onClick={() => speakWord(currentCard?.vocabularyWord.word || "")}
-              title="Listen to pronunciation"
+              onClick={() => speakWord(currentCard?.vocabularyWord.word || "", currentCard?.vocabularyWord.language)}
+              title={`Listen to pronunciation (${currentCard?.vocabularyWord.language === "hi" ? "Hindi" : "English"})`}
               className="h-10 w-10 rounded-2xl bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/40 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-indigo-500/30 active:scale-95"
             >
               <Volume2 className="h-5 w-5" />

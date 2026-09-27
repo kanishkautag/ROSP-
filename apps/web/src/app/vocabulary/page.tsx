@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Search, Filter, Plus, BookOpen, Sparkles, Check,
-  FolderPlus, ArrowLeft, Volume2, Tag, Layers
+  FolderPlus, ArrowLeft, Volume2, Tag, Layers, Globe
 } from "lucide-react";
+import { speakWord } from "@/lib/utils/tts";
 
 interface WordItem {
   id: string;
@@ -28,6 +29,7 @@ export default function VocabularyCatalogPage() {
   const [words, setWords] = useState<WordItem[]>([]);
   const [query, setQuery] = useState("");
   const [selectedCefr, setSelectedCefr] = useState<string>("ALL");
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
 
   // Add to list modal
@@ -44,18 +46,9 @@ export default function VocabularyCatalogPage() {
   const [customExample, setCustomExample] = useState("");
   const [customPos, setCustomPos] = useState("noun");
   const [customCefr, setCustomCefr] = useState("B1");
+  const [customLanguage, setCustomLanguage] = useState("en");
 
   const cefrLevels = ["ALL", "A1", "A2", "B1", "B2", "C1", "C2"];
-
-  const speak = (text: string) => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-US";
-      utterance.rate = 0.9;
-      window.speechSynthesis.speak(utterance);
-    }
-  };
 
   const fetchWords = async () => {
     setLoading(true);
@@ -63,6 +56,7 @@ export default function VocabularyCatalogPage() {
       const params = new URLSearchParams();
       if (query.trim()) params.append("query", query.trim());
       if (selectedCefr !== "ALL") params.append("cefrLevel", selectedCefr);
+      if (selectedLanguage !== "ALL") params.append("language", selectedLanguage);
 
       const res = await fetch(`/api/words?${params.toString()}`);
       if (res.ok) {
@@ -145,17 +139,18 @@ export default function VocabularyCatalogPage() {
     if (!customWord.trim() || !customMeaning.trim()) return;
 
     try {
+      const isHindi = customLanguage === "hi" || /[\u0900-\u097F]/.test(customWord);
       const res = await fetch("/api/words", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          word: customWord.trim().toLowerCase(),
-          language: "en",
+          word: isHindi ? customWord.trim() : customWord.trim().toLowerCase(),
+          language: isHindi ? "hi" : "en",
           meaning: customMeaning.trim(),
           example: customExample.trim() || undefined,
           partOfSpeech: customPos,
           cefrLevel: customCefr as any,
-          source: "Custom User Entry",
+          source: isHindi ? "Custom Hindi Entry" : "Custom User Entry",
         }),
       });
 
@@ -220,24 +215,49 @@ export default function VocabularyCatalogPage() {
           </button>
         </form>
 
-        {/* CEFR Level Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">
-            CEFR Level:
-          </span>
-          {cefrLevels.map((lvl) => (
-            <button
-              key={lvl}
-              onClick={() => setSelectedCefr(lvl)}
-              className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
-                selectedCefr === lvl
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
-              }`}
-            >
-              {lvl}
-            </button>
-          ))}
+        {/* Language & CEFR Level Filter Pills */}
+        <div className="space-y-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">
+              Language:
+            </span>
+            {[
+              { id: "ALL", label: "All Languages" },
+              { id: "en", label: "English 🇬🇧" },
+              { id: "hi", label: "Hindi 🇮🇳 (हिंदी)" },
+            ].map((lang) => (
+              <button
+                key={lang.id}
+                onClick={() => setSelectedLanguage(lang.id)}
+                className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  selectedLanguage === lang.id
+                    ? "bg-violet-600 text-white shadow-sm shadow-violet-600/30"
+                    : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
+                }`}
+              >
+                {lang.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">
+              CEFR Level:
+            </span>
+            {cefrLevels.map((lvl) => (
+              <button
+                key={lvl}
+                onClick={() => setSelectedCefr(lvl)}
+                className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  selectedCefr === lvl
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
+                }`}
+              >
+                {lvl}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -255,9 +275,16 @@ export default function VocabularyCatalogPage() {
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
-                    {item.partOfSpeech || "word"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
+                      {item.partOfSpeech || "word"}
+                    </span>
+                    {item.language === "hi" && (
+                      <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 text-[10px] font-bold border border-amber-500/20">
+                        हिंदी
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     {item.cefrLevel && (
                       <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 text-[10px] font-bold border border-indigo-500/20">
@@ -280,10 +307,10 @@ export default function VocabularyCatalogPage() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      speak(item.word);
+                      speakWord(item.word, item.language);
                     }}
                     className="p-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-indigo-500/50 hover:bg-slate-800 text-indigo-400 hover:text-white transition-all cursor-pointer shadow-sm"
-                    title="Pronounce word"
+                    title={`Pronounce (${item.language === "hi" ? "Hindi" : "English"})`}
                   >
                     <Volume2 className="h-4 w-4" />
                   </button>

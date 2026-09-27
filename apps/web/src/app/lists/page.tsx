@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronUp, Play, Sparkles, BookOpen, AlertCircle, Check, Volume2, Search, X
 } from "lucide-react";
 import { AnkiImportModal } from "@/components/anki_import_modal";
+import { speakWord } from "@/lib/utils/tts";
 
 interface VocabItem {
   id: string;
@@ -61,13 +62,7 @@ export default function WordListsPage() {
   const [dropTargetListId, setDropTargetListId] = useState<string | null>(null);
 
   const speak = (text: string) => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-US";
-      utterance.rate = 0.9;
-      window.speechSynthesis.speak(utterance);
-    }
+    speakWord(text);
   };
 
   const handleSearchCatalog = async (q: string) => {

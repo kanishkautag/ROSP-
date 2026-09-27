@@ -82,6 +82,11 @@ async function runIngestion() {
       description: "Sophisticated vocabulary and collocations to reach band 8.0-9.0 in IELTS.",
       filterSource: "IELTS Band 8+",
     },
+    {
+      name: "Hindi Essentials & Conversational (हिंदी)",
+      description: "Core Hindi vocabulary, common idioms, and daily conversational expressions.",
+      filterSource: "Hindi Essentials (हिंदी)",
+    },
   ];
 
   for (const user of users) {
