@@ -29,8 +29,8 @@ model User {
   name           String?
   passwordHash   String?         @map("password_hash")
   image          String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
   accounts       Account[]
   sessions       Session[]
   wordLists      WordList[]
@@ -42,10 +42,10 @@ model User {
 
 model Account {
   id                String  @id @default(uuid())
-  userId            String
+  userId            String  @map("user_id")
   type              String
   provider          String
-  providerAccountId String
+  providerAccountId String  @map("provider_account_id")
   refreshToken      String? @map("refresh_token")
   accessToken       String? @map("access_token")
   expiresAt         Int?    @map("expires_at")
@@ -63,7 +63,7 @@ model Account {
 model Session {
   id           String   @id @default(uuid())
   sessionToken String   @unique @map("session_token")
-  userId       String
+  userId       String   @map("user_id")
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -73,11 +73,11 @@ model Session {
 
 model WordList {
   id          String         @id @default(uuid())
-  userId      String
+  userId      String         @map("user_id")
   name        String
   description String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
   user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   items       WordListItem[]
 
@@ -89,15 +89,15 @@ model VocabularyWord {
   id            String         @id @default(uuid())
   word          String
   language      String         @default("en")
-  meaning       String
+  meaning       String         @map("definition")
   example       String?
-  partOfSpeech  String?
-  cefrLevel     String?
+  partOfSpeech  String?        @map("part_of_speech")
+  cefrLevel     String?        @map("cefr_level")
   frequency     Float?
-  frequencyRank Int?
+  frequencyRank Int?           @map("frequency_rank")
   source        String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
   listItems     WordListItem[]
   userWords     UserWord[]
 
@@ -108,9 +108,9 @@ model VocabularyWord {
 
 model WordListItem {
   id               String         @id @default(uuid())
-  wordListId       String
-  vocabularyWordId String
-  createdAt        DateTime       @default(now())
+  wordListId       String         @map("word_list_id")
+  vocabularyWordId String         @map("vocabulary_word_id")
+  createdAt        DateTime       @default(now()) @map("created_at")
   wordList         WordList       @relation(fields: [wordListId], references: [id], onDelete: Cascade)
   vocabularyWord   VocabularyWord @relation(fields: [vocabularyWordId], references: [id], onDelete: Cascade)
 
@@ -122,10 +122,10 @@ model WordListItem {
 
 model UserWord {
   id               String          @id @default(uuid())
-  userId           String
-  vocabularyWordId String
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  userId           String          @map("user_id")
+  vocabularyWordId String          @map("vocabulary_word_id")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
   user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   vocabularyWord   VocabularyWord  @relation(fields: [vocabularyWordId], references: [id], onDelete: Cascade)
   learningState    LearningState?
@@ -139,21 +139,21 @@ model UserWord {
 
 model LearningState {
   id             String    @id @default(uuid())
-  userWordId     String    @unique
+  userWordId     String    @unique @map("user_word_id")
   algorithm      Algorithm @default(SM2)
   // SM2 fields
   repetitions    Int?      @default(0)
   interval       Float?    @default(0)
-  easeFactor     Float?    @default(2.5)
+  easeFactor     Float?    @default(2.5) @map("ease_factor")
   // FSRS fields
   difficulty     Float?
   stability      Float?
   retrievability Float?
   // Scheduling dates
-  lastReviewedAt DateTime?
-  nextReviewAt   DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  lastReviewedAt DateTime? @map("last_reviewed_at")
+  nextReviewAt   DateTime? @map("next_review_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
   userWord       UserWord  @relation(fields: [userWordId], references: [id], onDelete: Cascade)
 
   @@index([userWordId])
@@ -163,16 +163,16 @@ model LearningState {
 
 model ReviewAttempt {
   id                 String     @id @default(uuid())
-  userId             String
-  userWordId         String
+  userId             String     @map("user_id")
+  userWordId         String     @map("user_word_id")
   rating             Int
   correct            Boolean
-  reviewedAt         DateTime   @default(now())
-  previousInterval   Float?
-  newInterval        Float?
-  previousEaseFactor Float?
-  newEaseFactor      Float?
-  createdAt          DateTime   @default(now())
+  reviewedAt         DateTime   @default(now()) @map("reviewed_at")
+  previousInterval   Float?     @map("previous_interval")
+  newInterval        Float?     @map("new_interval")
+  previousEaseFactor Float?     @map("previous_ease_factor")
+  newEaseFactor      Float?     @map("new_ease_factor")
+  createdAt          DateTime   @default(now()) @map("created_at")
   user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   userWord           UserWord   @relation(fields: [userWordId], references: [id], onDelete: Cascade)
   exercises          Exercise[]
@@ -185,7 +185,7 @@ model ReviewAttempt {
 
 model Exercise {
   id              String        @id @default(uuid())
-  reviewAttemptId String?
+  reviewAttemptId String?       @map("review_attempt_id")
   type            ExerciseType
   question        String
   response        String?
@@ -193,7 +193,7 @@ model Exercise {
   explanation     String?
   provider        LLMProvider
   model           String
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime      @default(now()) @map("created_at")
   reviewAttempt   ReviewAttempt? @relation(fields: [reviewAttemptId], references: [id], onDelete: SetNull)
 
   @@index([reviewAttemptId])
