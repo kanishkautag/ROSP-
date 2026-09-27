@@ -24,31 +24,35 @@ export async function lookupWordOnline(
   const query = rawQuery.trim();
   if (!query) return null;
 
-  // 1. First check local database
-  const localMatch = await prisma.vocabularyWord.findFirst({
-    where: {
-      word: {
-        equals: query,
-        mode: "insensitive",
+  // 1. First check local database with safe error handling
+  try {
+    const localMatch = await prisma.vocabularyWord.findFirst({
+      where: {
+        word: {
+          equals: query,
+          mode: "insensitive",
+        },
+        ...(preferredLanguage && preferredLanguage !== "ALL"
+          ? { language: preferredLanguage }
+          : {}),
       },
-      ...(preferredLanguage && preferredLanguage !== "ALL"
-        ? { language: preferredLanguage }
-        : {}),
-    },
-  });
+    });
 
-  if (localMatch) {
-    return {
-      id: localMatch.id,
-      word: localMatch.word,
-      language: localMatch.language,
-      partOfSpeech: localMatch.partOfSpeech,
-      meaning: localMatch.meaning,
-      example: localMatch.example,
-      cefrLevel: localMatch.cefrLevel,
-      source: localMatch.source || "Local Vocabulary Vault",
-      isLocal: true,
-    };
+    if (localMatch) {
+      return {
+        id: localMatch.id,
+        word: localMatch.word,
+        language: localMatch.language,
+        partOfSpeech: localMatch.partOfSpeech,
+        meaning: localMatch.meaning,
+        example: localMatch.example,
+        cefrLevel: localMatch.cefrLevel,
+        source: localMatch.source || "Local Vocabulary Vault",
+        isLocal: true,
+      };
+    }
+  } catch (dbErr) {
+    console.warn("Local DB lookup temporarily unreachable, falling back to online dictionary:", dbErr);
   }
 
   // 2. Query Groq LLM Oxford/Cambridge Engine
