@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Bot, X, Send, Sparkles, HelpCircle, BookOpen, Lightbulb } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -158,13 +159,72 @@ export function AiTutorDrawer({
               }`}
             >
               <div
-                className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed whitespace-pre-wrap ${
+                className={`max-w-[88%] rounded-2xl p-3.5 text-xs leading-relaxed ${
                   m.role === "user"
                     ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-slate-800/90 text-slate-200 border border-white/5"
+                    : "bg-slate-800/90 text-slate-200 border border-white/10 shadow-md"
                 }`}
               >
-                {m.content}
+                {m.role === "user" ? (
+                  <div className="whitespace-pre-wrap">{m.content}</div>
+                ) : (
+                  <div className="space-y-1">
+                    <ReactMarkdown
+                      components={{
+                        h1: ({ children }) => (
+                          <h1 className="text-sm font-bold text-white mt-2 mb-1.5 flex items-center gap-1.5 border-b border-white/10 pb-1">
+                            {children}
+                          </h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-xs font-bold text-indigo-300 mt-2.5 mb-1 flex items-center gap-1">
+                            {children}
+                          </h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-xs font-bold text-indigo-200 mt-2 mb-1 flex items-center gap-1">
+                            {children}
+                          </h3>
+                        ),
+                        p: ({ children }) => (
+                          <p className="mb-2 last:mb-0 leading-relaxed text-slate-200">{children}</p>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="my-1.5 space-y-1 pl-4 list-disc marker:text-indigo-400">
+                            {children}
+                          </ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="my-1.5 space-y-1 pl-4 list-decimal marker:text-indigo-400">
+                            {children}
+                          </ol>
+                        ),
+                        li: ({ children }) => (
+                          <li className="leading-relaxed text-slate-200">{children}</li>
+                        ),
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-white">{children}</strong>
+                        ),
+                        em: ({ children }) => (
+                          <em className="italic text-indigo-300">{children}</em>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-2 border-indigo-500 bg-indigo-950/40 px-3 py-1.5 my-2 rounded-r-xl text-indigo-200 italic">
+                            {children}
+                          </blockquote>
+                        ),
+                        hr: () => <hr className="border-white/10 my-2.5" />,
+                        code: ({ children }) => (
+                          <code className="px-1.5 py-0.5 rounded bg-slate-950 border border-white/10 text-indigo-300 font-mono text-[11px]">
+                            {children}
+                          </code>
+                        ),
+                      }}
+                    >
+                      {m.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
           ))}
