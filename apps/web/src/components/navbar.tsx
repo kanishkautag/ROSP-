@@ -13,8 +13,8 @@ export async function Navbar() {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-md shadow-indigo-500/25 group-hover:scale-105 transition-transform">
             <Brain className="h-5 w-5 text-white" />
           </div>
-          <span className="text-lg font-bold tracking-tight text-white">
-            ROSP <span className="text-xs font-medium text-indigo-400 border border-indigo-500/30 rounded-full px-2 py-0.5 ml-1">AI SRS</span>
+          <span className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
+            LinguaPulse <span className="text-[11px] font-semibold text-indigo-400 border border-indigo-500/30 rounded-full px-2 py-0.5 ml-1">AI Assistant</span>
           </span>
         </Link>
 

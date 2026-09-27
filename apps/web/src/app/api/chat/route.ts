@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const systemPrompt = `You are Lexi, an encouraging, highly knowledgeable AI language tutor and vocabulary coach for the ROSP Spaced Repetition app.
+    const systemPrompt = `You are Lexi, an encouraging, highly knowledgeable AI language tutor and vocabulary coach for the LinguaPulse Language Learning app.
 Current Word in Focus: "${currentWord || "General Vocabulary"}"
 Meaning: "${currentMeaning || "N/A"}"
 Example: "${currentExample || "N/A"}"

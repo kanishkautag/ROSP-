@@ -4,7 +4,7 @@ import { GlobalAiTutor } from "@/components/global_ai_tutor";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ROSP - AI Assisted Language Learning App with Spaced Repetition",
+  title: "LinguaPulse - AI-Assisted Language Learning & Spaced Repetition",
   description:
     "Learn vocabulary. Practice with AI. Review at the right time using SM2 or FSRS algorithms and Ollama/Groq generated exercises.",
 };
@@ -21,7 +21,7 @@ export default function RootLayout({
         <main className="flex-1 flex flex-col">{children}</main>
         <GlobalAiTutor />
         <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500">
-          <p>© 2026 ROSP - AI Assisted Language Learning App with Spaced Repetition</p>
+          <p>© 2026 LinguaPulse - AI-Assisted Language Learning & Spaced Repetition</p>
         </footer>
       </body>
     </html>
