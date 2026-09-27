@@ -12,7 +12,8 @@
     "db:push": "pnpm --filter @rosp/db db:push",
     "db:seed": "pnpm --filter @rosp/db db:seed",
     "db:studio": "pnpm --filter @rosp/db db:studio",
-    "vocab:ingest": "tsx scripts/vocabulary/ingest.ts"
+    "vocab:ingest": "tsx scripts/vocabulary/ingest.ts",
+    "vocab:import-hindi": "tsx scripts/vocabulary/import_hindi_dataset.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.3",
