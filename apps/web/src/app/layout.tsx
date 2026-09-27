@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
+import { GlobalAiTutor } from "@/components/global_ai_tutor";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
         <Navbar />
         <main className="flex-1 flex flex-col">{children}</main>
+        <GlobalAiTutor />
         <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500">
           <p>© 2026 ROSP - AI Assisted Language Learning App with Spaced Repetition</p>
         </footer>

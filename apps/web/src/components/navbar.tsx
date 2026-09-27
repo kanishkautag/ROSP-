@@ -22,6 +22,9 @@ export async function Navbar() {
           <Link href="/dashboard" className="hover:text-white transition-colors">
             Dashboard
           </Link>
+          <Link href="/vocabulary" className="hover:text-white transition-colors">
+            Vocabulary
+          </Link>
           <Link href="/lists" className="hover:text-white transition-colors">
             Lists
           </Link>

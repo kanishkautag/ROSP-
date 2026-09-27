@@ -47,6 +47,16 @@ export default function VocabularyCatalogPage() {
 
   const cefrLevels = ["ALL", "A1", "A2", "B1", "B2", "C1", "C2"];
 
+  const speak = (text: string) => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "en-US";
+      utterance.rate = 0.9;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   const fetchWords = async () => {
     setLoading(true);
     try {
@@ -262,9 +272,22 @@ export default function VocabularyCatalogPage() {
                   </div>
                 </div>
 
-                <h3 className="text-2xl font-extrabold text-white mb-2 tracking-tight group-hover:text-indigo-200 transition-colors">
-                  {item.word}
-                </h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-2xl font-extrabold text-white tracking-tight group-hover:text-indigo-200 transition-colors">
+                    {item.word}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      speak(item.word);
+                    }}
+                    className="p-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-indigo-500/50 hover:bg-slate-800 text-indigo-400 hover:text-white transition-all cursor-pointer shadow-sm"
+                    title="Pronounce word"
+                  >
+                    <Volume2 className="h-4 w-4" />
+                  </button>
+                </div>
 
                 <p className="text-xs text-slate-300 mb-4 line-clamp-3 leading-relaxed">
                   {item.meaning}
