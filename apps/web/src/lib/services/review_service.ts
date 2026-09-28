@@ -2,25 +2,93 @@ import prisma from "@rosp/db";
 import { ReviewSubmissionInput } from "@rosp/shared";
 import { LearningAlgorithmFactory } from "../learning/learning_algorithm_factory";
 
-export async function getDueReviews(userId: string, limit = 20) {
+export async function getDueReviews(
+  userId: string,
+  limit = 20,
+  language?: string,
+  wordListId?: string,
+  mode: "due" | "all" = "due"
+) {
   const now = new Date();
 
-  return prisma.userWord.findMany({
-    where: {
-      userId,
-      learningState: {
-        OR: [
-          { nextReviewAt: { lte: now } },
-          { nextReviewAt: null },
-        ],
+  // If wordListId is provided, get vocabulary IDs from that list
+  let vocabularyWordIds: string[] | undefined = undefined;
+  if (wordListId) {
+    const listItems = await prisma.wordListItem.findMany({
+      where: { wordListId },
+      select: { vocabularyWordId: true },
+    });
+    vocabularyWordIds = listItems.map((li) => li.vocabularyWordId);
+  }
+
+  const where: any = {
+    userId,
+    ...(language && language !== "ALL"
+      ? {
+          vocabularyWord: {
+            language,
+          },
+        }
+      : {}),
+    ...(vocabularyWordIds ? { vocabularyWordId: { in: vocabularyWordIds } } : {}),
+  };
+
+  if (mode === "due") {
+    where.learningState = {
+      OR: [
+        { nextReviewAt: { lte: now } },
+        { nextReviewAt: null },
+      ],
+    };
+  }
+
+  const [reviews, userWords] = await Promise.all([
+    prisma.userWord.findMany({
+      where,
+      include: {
+        vocabularyWord: true,
+        learningState: true,
       },
-    },
-    include: {
-      vocabularyWord: true,
-      learningState: true,
-    },
-    take: limit,
-  });
+      orderBy: [
+        {
+          learningState: {
+            nextReviewAt: "asc",
+          },
+        },
+        {
+          createdAt: "desc",
+        },
+      ],
+      take: limit,
+    }),
+    prisma.userWord.findMany({
+      where: { userId },
+      select: {
+        vocabularyWord: { select: { language: true } },
+        learningState: { select: { nextReviewAt: true } },
+      },
+    }),
+  ]);
+
+  const countsByLanguage: Record<string, { due: number; total: number }> = {
+    ALL: { due: 0, total: userWords.length },
+  };
+
+  for (const uw of userWords) {
+    const lang = uw.vocabularyWord.language || "en";
+    if (!countsByLanguage[lang]) {
+      countsByLanguage[lang] = { due: 0, total: 0 };
+    }
+    countsByLanguage[lang].total += 1;
+
+    const isDue = !uw.learningState?.nextReviewAt || uw.learningState.nextReviewAt <= now;
+    if (isDue) {
+      countsByLanguage.ALL.due += 1;
+      countsByLanguage[lang].due += 1;
+    }
+  }
+
+  return { reviews, countsByLanguage };
 }
 
 export async function processReviewSubmission(

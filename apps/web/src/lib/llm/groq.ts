@@ -106,10 +106,38 @@ Output ONLY a JSON object with keys "question", "answer", "options", and "explan
     );
 
     const parsed = JSON.parse(rawResponse);
+    let options: string[] = Array.isArray(parsed.options) ? parsed.options : [payload.word];
+
+    if (payload.exerciseType === "SENTENCE_CONSTRUCTION") {
+      let tokens = options
+        .map((tok: string) => String(tok).replace(/[.,/#!$%^&*;:{}=\-_`~()?"']/g, "").trim())
+        .filter(Boolean);
+
+      if (tokens.length < 3 && parsed.answer) {
+        tokens = String(parsed.answer)
+          .replace(/[.,/#!$%^&*;:{}=\-_`~()?"']/g, "")
+          .split(/\s+/)
+          .filter(Boolean);
+      }
+
+      // Enforce true Fisher-Yates shuffle that is different from original
+      const originalOrder = tokens.join(" ");
+      let attempts = 0;
+      while (attempts < 10) {
+        for (let i = tokens.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [tokens[i], tokens[j]] = [tokens[j], tokens[i]];
+        }
+        if (tokens.join(" ") !== originalOrder || tokens.length <= 1) break;
+        attempts++;
+      }
+      options = tokens;
+    }
+
     return {
-      question: parsed.question || `Practice word: "${payload.word}"`,
+      question: parsed.question || `Construct a sentence using "${payload.word}":`,
       answer: parsed.answer || payload.word,
-      options: Array.isArray(parsed.options) ? parsed.options : [payload.word],
+      options,
       explanation: parsed.explanation || `"${payload.word}": ${payload.meaning}`,
       rawResponse,
     };

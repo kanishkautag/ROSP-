@@ -578,7 +578,11 @@ export default function WordListsPage() {
                     </button>
 
                     <Link
-                      href="/review"
+                      href={
+                        list.name.toLowerCase().includes("hindi")
+                          ? "/review?lang=hi"
+                          : `/review?listId=${list.id}`
+                      }
                       className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 px-3 py-1.5 text-xs font-semibold border border-indigo-500/30 transition-all"
                     >
                       <Play className="h-3 w-3 fill-current" />

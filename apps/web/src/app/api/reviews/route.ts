@@ -3,15 +3,29 @@ import { getCurrentUser } from "@/lib/auth/auth";
 import { getDueReviews, processReviewSubmission } from "@/lib/services/review_service";
 import { ReviewSubmissionSchema } from "@rosp/shared";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const dueReviews = await getDueReviews(user.id);
-    return NextResponse.json({ reviews: dueReviews });
+    const { searchParams } = new URL(req.url);
+    const limitParam = searchParams.get("limit");
+    const limit = limitParam ? Math.min(100, Math.max(1, parseInt(limitParam, 10))) : 20;
+    const language = searchParams.get("language") || searchParams.get("lang") || undefined;
+    const wordListId = searchParams.get("wordListId") || searchParams.get("listId") || undefined;
+    const mode = (searchParams.get("mode") as "due" | "all") || "due";
+
+    const { reviews, countsByLanguage } = await getDueReviews(
+      user.id,
+      limit,
+      language,
+      wordListId,
+      mode
+    );
+
+    return NextResponse.json({ reviews, countsByLanguage });
   } catch (error) {
     console.error("Failed to fetch due reviews:", error);
     return NextResponse.json(
