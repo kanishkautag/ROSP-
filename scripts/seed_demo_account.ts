@@ -12,15 +12,7 @@ function hashPassword(password: string): Promise<string> {
   });
 }
 
-export async function seedDemoAccount() {
-  console.log("=== ROSP Demo Account Seeding Script ===");
-
-  if (process.env.NODE_ENV === "production" && !process.env.ALLOW_DEMO_SEED) {
-    throw new Error("Demo account seeding is strictly disabled in production.");
-  }
-
-  const email = "demo@rosp.local";
-  const rawPassword = process.env.DEMO_USER_PASSWORD || "DemoPass2026!";
+export async function seedSingleAccount(email: string, rawPassword: string) {
   const timezone = "Asia/Kolkata";
   const dailyGoal = 10;
 
@@ -35,16 +27,16 @@ export async function seedDemoAccount() {
       passwordHash,
       timezone,
       dailyGoal,
-      name: "Demo Learner (Indic & English)",
-      image: "https://avatar.vercel.sh/demo@rosp.local",
+      name: email === "demo@rosp.local" ? "Demo Learner (Indic & English)" : "Developer Demo (Indic & English)",
+      image: `https://avatar.vercel.sh/${email}`,
     },
     create: {
       email,
       passwordHash,
-      name: "Demo Learner (Indic & English)",
+      name: email === "demo@rosp.local" ? "Demo Learner (Indic & English)" : "Developer Demo (Indic & English)",
       timezone,
       dailyGoal,
-      image: "https://avatar.vercel.sh/demo@rosp.local",
+      image: `https://avatar.vercel.sh/${email}`,
     },
   });
 
@@ -55,19 +47,15 @@ export async function seedDemoAccount() {
   await prisma.dailyActivity.deleteMany({ where: { userId: demoUser.id } });
   await prisma.reviewAttempt.deleteMany({ where: { userId: demoUser.id } });
 
-  // 3. Fetch vocabulary words across Hindi, Marathi, and English
+  // 3. Fetch vocabulary words across Hindi, Marathi, and English (sample top 50 per language for personal lists)
   const [hindiWords, marathiWords, englishWords] = await Promise.all([
-    prisma.vocabularyWord.findMany({ where: { language: "hi" } }),
-    prisma.vocabularyWord.findMany({ where: { language: "mr" } }),
-    prisma.vocabularyWord.findMany({ where: { language: "en" } }),
+    prisma.vocabularyWord.findMany({ where: { language: "hi" }, take: 60 }),
+    prisma.vocabularyWord.findMany({ where: { language: "mr" }, take: 60 }),
+    prisma.vocabularyWord.findMany({ where: { language: "en" }, take: 60 }),
   ]);
 
-  console.log(
-    `Available words for demo: Hindi (${hindiWords.length}), Marathi (${marathiWords.length}), English (${englishWords.length})`
-  );
-
   if (hindiWords.length === 0 || marathiWords.length === 0 || englishWords.length === 0) {
-    throw new Error("Vocabulary not populated. Run pnpm vocab:ingest first.");
+    throw new Error("Vocabulary not populated. Run pnpm vocab:import-ngsl and pnpm vocab:import-indic first.");
   }
 
   // 4. Create three separate, independent WordLists for Demo User
@@ -89,7 +77,6 @@ export async function seedDemoAccount() {
     },
   ];
 
-  const allDemoWords: any[] = [];
   const userWordMap = new Map<string, string>(); // vocabularyWordId -> userWordId
 
   for (const col of collections) {
@@ -128,8 +115,6 @@ export async function seedDemoAccount() {
       data: userWordsData,
       skipDuplicates: true,
     });
-
-    allDemoWords.push(...col.words);
   }
 
   // Populate userWordMap
@@ -151,10 +136,7 @@ export async function seedDemoAccount() {
     currDate = getPreviousDate(currDate);
   }
 
-  console.log(`Seeding 14 consecutive dates: from ${consecutiveDates[0]} to ${consecutiveDates[13]}`);
-
   // Create a pool of at least 30 distinct words to cycle through across the 14 days
-  // Ensure balanced representation of Hindi, Marathi, and English
   const selectedPool: any[] = [];
   const maxPoolSize = 30;
   for (let i = 0; i < maxPoolSize; i++) {
@@ -171,18 +153,19 @@ export async function seedDemoAccount() {
   let totalCorrect = 0;
   let totalIncorrect = 0;
 
+  const reviewAttemptsData: any[] = [];
+  const xpEventsData: any[] = [];
+  const dailyActivitiesData: any[] = [];
+
   for (let dayIndex = 0; dayIndex < 14; dayIndex++) {
     const dateStr = consecutiveDates[dayIndex];
-    // Pick 10 distinct words for this date by rotating through the pool
     const dayWords: any[] = [];
     for (let w = 0; w < 10; w++) {
       const wordIndex = (dayIndex * 3 + w) % selectedPool.length;
       dayWords.push(selectedPool[wordIndex]);
     }
 
-    // Parse dateStr to create realistic timestamp in Asia/Kolkata (e.g. 10:30 AM local time)
     const [y, m, d] = dateStr.split("-").map(Number);
-    // 10:30 AM in Asia/Kolkata is 05:00 UTC
     const dateTimestamp = new Date(Date.UTC(y, m - 1, d, 5, 0 + dayIndex, 0));
 
     let dayXp = 0;
@@ -192,93 +175,91 @@ export async function seedDemoAccount() {
       const userWordId = userWordMap.get(word.id);
       if (!userWordId) continue;
 
-      // 8 correct, 2 incorrect (words at index 0..7 are correct, 8..9 are incorrect)
       const isCorrect = wordIndex < 8;
       const rating = isCorrect ? 3 : 1;
 
       if (isCorrect) totalCorrect++;
       else totalIncorrect++;
 
-      // 1. Create ReviewAttempt
-      await prisma.reviewAttempt.create({
-        data: {
-          userId: demoUser.id,
-          userWordId,
-          rating,
-          correct: isCorrect,
-          reviewedAt: dateTimestamp,
-          previousInterval: 1.0,
-          newInterval: isCorrect ? 3.0 : 1.0,
-          previousEaseFactor: 2.5,
-          newEaseFactor: isCorrect ? 2.6 : 2.3,
-        },
+      reviewAttemptsData.push({
+        userId: demoUser.id,
+        userWordId,
+        rating,
+        correct: isCorrect,
+        reviewedAt: dateTimestamp,
+        previousInterval: 1.0,
+        newInterval: isCorrect ? 3.0 : 1.0,
+        previousEaseFactor: 2.5,
+        newEaseFactor: isCorrect ? 2.6 : 2.3,
       });
 
       // 2. Award 5 XP for first review of distinct word that day
       const reviewKey = `user_${demoUser.id}_${dateStr}_${word.id}_review`;
-      await prisma.xpEvent.create({
-        data: {
-          userId: demoUser.id,
-          amount: 5,
-          reason: "WORD_REVIEW",
-          idempotencyKey: reviewKey,
-          activityDate: dateStr,
-          vocabularyWordId: word.id,
-          createdAt: dateTimestamp,
-        },
+      xpEventsData.push({
+        userId: demoUser.id,
+        amount: 5,
+        reason: "WORD_REVIEW",
+        idempotencyKey: reviewKey,
+        activityDate: dateStr,
+        vocabularyWordId: word.id,
+        createdAt: dateTimestamp,
       });
       dayXp += 5;
 
       // 3. Award 5 bonus XP if first answer is correct
       if (isCorrect) {
         const correctKey = `user_${demoUser.id}_${dateStr}_${word.id}_first_correct`;
-        await prisma.xpEvent.create({
-          data: {
-            userId: demoUser.id,
-            amount: 5,
-            reason: "CORRECT_BONUS",
-            idempotencyKey: correctKey,
-            activityDate: dateStr,
-            vocabularyWordId: word.id,
-            createdAt: dateTimestamp,
-          },
+        xpEventsData.push({
+          userId: demoUser.id,
+          amount: 5,
+          reason: "CORRECT_BONUS",
+          idempotencyKey: correctKey,
+          activityDate: dateStr,
+          vocabularyWordId: word.id,
+          createdAt: dateTimestamp,
         });
         dayXp += 5;
       }
     }
 
-    // 4. Award 20 bonus XP for reaching daily goal (10 words >= 10 dailyGoal)
+    // 4. Award 20 bonus XP for reaching daily goal
     const goalKey = `user_${demoUser.id}_${dateStr}_daily_goal`;
-    await prisma.xpEvent.create({
-      data: {
-        userId: demoUser.id,
-        amount: 20,
-        reason: "DAILY_GOAL",
-        idempotencyKey: goalKey,
-        activityDate: dateStr,
-        vocabularyWordId: null,
-        createdAt: dateTimestamp,
-      },
+    xpEventsData.push({
+      data: undefined,
+      userId: demoUser.id,
+      amount: 20,
+      reason: "DAILY_GOAL",
+      idempotencyKey: goalKey,
+      activityDate: dateStr,
+      vocabularyWordId: null,
+      createdAt: dateTimestamp,
     });
     dayXp += 20;
 
     totalSeededXp += dayXp;
 
-    // 5. Create DailyActivity record
-    await prisma.dailyActivity.create({
-      data: {
-        userId: demoUser.id,
-        activityDate: dateStr,
-        uniqueWordsReviewed: 10,
-        dailyGoalCompletedAt: dateTimestamp,
-        xpEarned: dayXp,
-        createdAt: dateTimestamp,
-      },
+    // 5. DailyActivity record
+    dailyActivitiesData.push({
+      userId: demoUser.id,
+      activityDate: dateStr,
+      uniqueWordsReviewed: 10,
+      dailyGoalCompletedAt: dateTimestamp,
+      xpEarned: dayXp,
+      createdAt: dateTimestamp,
     });
   }
 
+  // Batch insert historical data
+  console.log(`Batch inserting 140 review attempts for ${email}...`);
+  await prisma.reviewAttempt.createMany({ data: reviewAttemptsData });
+
+  console.log(`Batch inserting 266 XP events for ${email}...`);
+  await prisma.xpEvent.createMany({ data: xpEventsData });
+
+  console.log(`Batch inserting 14 daily activities for ${email}...`);
+  await prisma.dailyActivity.createMany({ data: dailyActivitiesData });
+
   // 6. Set up LearningState so that several words are currently due for immediate review
-  // Pick 6 words from Hindi, Marathi, and English to be due right now
   const dueVocabItems = [
     hindiWords[0],
     hindiWords[1],
@@ -289,9 +270,12 @@ export async function seedDemoAccount() {
   ].filter(Boolean);
 
   const pastDueTime = new Date(Date.now() - 3600 * 1000); // 1 hour ago
+  const dueUserWordIds = new Set<string>();
+
   for (const vocab of dueVocabItems) {
     const userWordId = userWordMap.get(vocab.id);
     if (!userWordId) continue;
+    dueUserWordIds.add(userWordId);
 
     await prisma.learningState.upsert({
       where: { userWordId },
@@ -314,31 +298,31 @@ export async function seedDemoAccount() {
     });
   }
 
-  // Ensure all other userWords have a default learning state
-  for (const [vocabId, uwId] of userWordMap.entries()) {
-    const existingState = await prisma.learningState.findUnique({
-      where: { userWordId: uwId },
-    });
-    if (!existingState) {
-      await prisma.learningState.create({
-        data: {
-          userWordId: uwId,
-          algorithm: "SM2",
-          repetitions: 1,
-          interval: 2.0,
-          easeFactor: 2.5,
-          nextReviewAt: new Date(Date.now() + 86400 * 1000 * 2), // due in 2 days
-        },
+  // Batch insert remaining default learning states
+  const remainingLearningStates: any[] = [];
+  const futureDueTime = new Date(Date.now() + 86400 * 1000 * 2);
+
+  for (const [, uwId] of userWordMap.entries()) {
+    if (!dueUserWordIds.has(uwId)) {
+      remainingLearningStates.push({
+        userWordId: uwId,
+        algorithm: "SM2",
+        repetitions: 1,
+        interval: 2.0,
+        easeFactor: 2.5,
+        nextReviewAt: futureDueTime,
       });
     }
   }
 
-  console.log("=== Demo Account Verification ===");
-  console.log(`- Total Seeded XP: ${totalSeededXp} (Target: 1540)`);
-  console.log(`- Total Correct First Answers: ${totalCorrect} (Target: 112)`);
-  console.log(`- Total Incorrect First Answers: ${totalIncorrect} (Target: 28)`);
-  console.log(`- Active Streak Dates: ${consecutiveDates.length} consecutive days`);
-  console.log(`- Immediate Due Reviews seeded: ${dueVocabItems.length} cards`);
+  if (remainingLearningStates.length > 0) {
+    await prisma.learningState.createMany({
+      data: remainingLearningStates,
+      skipDuplicates: true,
+    });
+  }
+
+  console.log(`✓ Completed seeding for ${email}: ${totalSeededXp} XP, 14-day streak, 140 reviews.`);
 
   return {
     email,
@@ -348,6 +332,22 @@ export async function seedDemoAccount() {
     consecutiveDates,
     dueCards: dueVocabItems.length,
   };
+}
+
+export async function seedDemoAccount() {
+  console.log("=== ROSP Demo Account Fast Batch Seeding Pipeline ===");
+
+  if (process.env.NODE_ENV === "production" && !process.env.ALLOW_DEMO_SEED) {
+    throw new Error("Demo account seeding is strictly disabled in production.");
+  }
+
+  const password = process.env.DEMO_USER_PASSWORD || "password123";
+
+  // Seed both canonical demo and dev demo accounts
+  const demoResult = await seedSingleAccount("demo@rosp.local", password);
+  const devResult = await seedSingleAccount("dev@rosp.local", password);
+
+  return { demoResult, devResult };
 }
 
 if (require.main === module) {

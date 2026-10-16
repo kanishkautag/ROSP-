@@ -51,7 +51,7 @@ export default function LoginPage() {
 
   const handleFillDemo = () => {
     setMode("login");
-    setEmail("dev@rosp.local");
+    setEmail("demo@rosp.local");
     setPassword("password123");
     setError(null);
   };
@@ -115,7 +115,7 @@ export default function LoginPage() {
               <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
               Demo Account
             </div>
-            <div className="text-[11px] text-slate-400">dev@rosp.local / password123</div>
+            <div className="text-[11px] text-slate-400">demo@rosp.local / password123</div>
           </div>
           <button
             type="button"
