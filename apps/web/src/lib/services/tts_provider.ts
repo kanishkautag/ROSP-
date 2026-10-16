@@ -1,9 +1,8 @@
 /**
  * Indic TTS Provider Interface
- * Supports AI4Bharat Indic-TTS and Bhashini API providers behind a clean abstraction.
+ * Supports AI4Bharat Indic-TTS and Bhashini OpenAPI (https://tts.bhashini.ai/openapi/ui/)
  * Model weight licensing: AI4Bharat models are licensed under MIT / CC-BY-4.0.
- * To avoid bundling multi-gigabyte PyTorch/ONNX model weights inside Next.js,
- * TTS operates as an external service provider with client-side licensed audio & browser fallback.
+ * Server credentials, audio streaming/base64 handling, and graceful browser voice fallback.
  */
 
 export interface TTSRequest {
@@ -26,14 +25,16 @@ export interface ITTSProvider {
 }
 
 export class BhashiniIndicTTSProvider implements ITTSProvider {
-  name = "bhashini";
+  readonly name = "bhashini";
 
   async synthesize(req: TTSRequest): Promise<TTSResponse> {
-    const apiKey = process.env.BHASHINI_API_KEY;
-    const userId = process.env.BHASHINI_USER_ID;
-    const pipelineId = process.env.BHASHINI_PIPELINE_ID;
+    const apiKey =
+      process.env.BHASHINI_API_KEY?.trim() ||
+      process.env.BHASHINI_TTS_KEY?.trim();
+    const userId = process.env.BHASHINI_USER_ID?.trim();
+    const pipelineId = process.env.BHASHINI_PIPELINE_ID?.trim();
 
-    if (!apiKey || !userId || !pipelineId) {
+    if (!apiKey) {
       return {
         provider: "bhashini",
         available: false,
@@ -41,66 +42,115 @@ export class BhashiniIndicTTSProvider implements ITTSProvider {
       };
     }
 
+    const langName =
+      req.language === "mr"
+        ? "Marathi"
+        : req.language === "hi"
+        ? "Hindi"
+        : req.language;
+
+    // 1. Try Bhashini OpenAPI v2 direct synthesize endpoint (https://tts.bhashini.ai/openapi/ui/)
     try {
-      const res = await fetch("https://dhruva-api.bhashini.gov.in/services/inference/pipeline", {
+      const openApiRes = await fetch("https://tts.bhashini.ai/v2/synthesize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: apiKey,
-          userID: userId,
+          "X-API-KEY": apiKey,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          pipelineTasks: [
-            {
-              taskType: "tts",
-              config: {
-                language: { sourceLanguage: req.language },
-                gender: req.gender || "female",
-              },
-            },
-          ],
-          inputData: {
-            input: [{ source: req.text }],
-          },
+          text: req.text,
+          language: langName,
+          voiceName: req.gender === "male" ? "Male1" : "Female1",
+          samplingRate: 16000,
         }),
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(5000),
       });
 
-      if (!res.ok) {
-        return {
-          provider: "bhashini",
-          available: false,
-          message: `Bhashini API returned status ${res.status}`,
-        };
-      }
-
-      const data = await res.json();
-      const base64Audio = data.pipelineResponse?.[0]?.output?.[0]?.audioContent;
-
-      if (base64Audio) {
-        return {
-          provider: "bhashini",
-          available: true,
-          audioBase64: base64Audio,
-        };
+      if (openApiRes.ok) {
+        const contentType = openApiRes.headers.get("content-type") || "";
+        if (contentType.includes("audio/") || contentType.includes("octet-stream")) {
+          const buffer = await openApiRes.arrayBuffer();
+          const base64Audio = Buffer.from(buffer).toString("base64");
+          return {
+            provider: "bhashini",
+            available: true,
+            audioBase64: base64Audio,
+          };
+        } else {
+          const json = await openApiRes.json();
+          if (json.audioBase64 || json.audioContent) {
+            return {
+              provider: "bhashini",
+              available: true,
+              audioBase64: json.audioBase64 || json.audioContent,
+            };
+          }
+        }
       }
     } catch (err: any) {
-      console.warn("Bhashini TTS request failed:", err?.message);
+      console.warn("Bhashini OpenAPI synthesize endpoint attempt failed:", err?.message);
+    }
+
+    // 2. Try Dhruva inference pipeline if pipeline credentials are provided
+    if (userId && pipelineId) {
+      try {
+        const pipelineRes = await fetch(
+          "https://dhruva-api.bhashini.gov.in/services/inference/pipeline",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: apiKey,
+              userID: userId,
+            },
+            body: JSON.stringify({
+              pipelineTasks: [
+                {
+                  taskType: "tts",
+                  config: {
+                    language: { sourceLanguage: req.language },
+                    gender: req.gender || "female",
+                  },
+                },
+              ],
+              inputData: {
+                input: [{ source: req.text }],
+              },
+            }),
+            signal: AbortSignal.timeout(6000),
+          }
+        );
+
+        if (pipelineRes.ok) {
+          const data = await pipelineRes.json();
+          const base64Audio = data.pipelineResponse?.[0]?.output?.[0]?.audioContent;
+          if (base64Audio) {
+            return {
+              provider: "bhashini",
+              available: true,
+              audioBase64: base64Audio,
+            };
+          }
+        }
+      } catch (err: any) {
+        console.warn("Bhashini Dhruva pipeline inference attempt failed:", err?.message);
+      }
     }
 
     return {
       provider: "bhashini",
       available: false,
-      message: "TTS inference pipeline unavailable",
+      message: "Bhashini TTS service unavailable or credentials invalid",
     };
   }
 }
 
 export class AI4BharatIndicTTSProvider implements ITTSProvider {
-  name = "ai4bharat";
+  readonly name = "ai4bharat";
 
   async synthesize(req: TTSRequest): Promise<TTSResponse> {
-    const ttsUrl = process.env.INDIC_TTS_URL;
+    const ttsUrl = process.env.INDIC_TTS_URL?.trim();
 
     if (!ttsUrl) {
       return {
@@ -153,8 +203,8 @@ export async function synthesizeSpeech(req: TTSRequest): Promise<TTSResponse> {
     if (result.available) return result;
   }
 
-  // Check Bhashini pipeline if configured
-  if (process.env.BHASHINI_API_KEY) {
+  // Check Bhashini pipeline / OpenAPI if configured
+  if (process.env.BHASHINI_API_KEY || process.env.BHASHINI_TTS_KEY) {
     const provider = new BhashiniIndicTTSProvider();
     const result = await provider.synthesize(req);
     if (result.available) return result;

@@ -13,9 +13,11 @@
     "db:seed": "pnpm --filter @rosp/db db:seed",
     "db:studio": "pnpm --filter @rosp/db db:studio",
     "vocab:ingest": "tsx scripts/vocabulary/ingest.ts",
+    "vocab:import-ngsl": "tsx scripts/vocabulary/import_ngsl.ts",
+    "vocab:import-indic": "tsx scripts/vocabulary/import_indic_glossaries.ts",
     "vocab:import-hindi": "tsx scripts/vocabulary/import_hindi_dataset.ts",
     "db:seed-demo": "tsx scripts/seed_demo_account.ts",
-    "test": "tsx --test tests/streak_xp_gamification.test.ts tests/multilingual_pronunciation_demo.test.ts"
+    "test": "tsx --test tests/streak_xp_gamification.test.ts tests/multilingual_pronunciation_demo.test.ts tests/dictionary_and_pronunciation.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.3",

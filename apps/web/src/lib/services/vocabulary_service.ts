@@ -22,6 +22,9 @@ export async function searchVocabularyWords(params: VocabularyWordQueryParams) {
     ...(language && language !== "ALL" && { language }),
     ...(topic && topic !== "ALL" && { topic }),
     ...(cefrLevel && (cefrLevel as string) !== "ALL" && { cefrLevel }),
+    source: {
+      notIn: ["user_personal_ephemeral"],
+    },
   };
 
   const [words, total] = await Promise.all([

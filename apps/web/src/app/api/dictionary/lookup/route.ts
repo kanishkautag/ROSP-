@@ -47,15 +47,18 @@ export async function POST(req: NextRequest) {
       example: body.example,
       partOfSpeech: body.partOfSpeech,
       cefrLevel: body.cefrLevel,
-      source: body.source || "Oxford & Cambridge Open Lexicon",
+      source: body.source || "User Discovered Entry",
+      canPersist: body.canPersist,
+      audioUrl: body.audioUrl,
     });
 
     return NextResponse.json({ success: true, word: saved }, { status: 201 });
   } catch (error: any) {
     console.error("Save dictionary word route error:", error);
+    const isLicensingError = error?.message?.includes("Licensing Restriction");
     return NextResponse.json(
       { error: error?.message || "Failed to save dictionary word to vault" },
-      { status: 500 }
+      { status: isLicensingError ? 403 : 500 }
     );
   }
 }
