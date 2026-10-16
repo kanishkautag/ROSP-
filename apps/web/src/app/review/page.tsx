@@ -74,6 +74,7 @@ function ReviewSessionContent() {
   const [reviewMode, setReviewMode] = useState<"due" | "all">(urlMode);
   const [countsByLanguage, setCountsByLanguage] = useState<Record<string, { due: number; total: number }>>({});
 
+  const [sessionLimit, setSessionLimit] = useState<number>(8);
   const [reviews, setReviews] = useState<DueReview[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -98,14 +99,15 @@ function ReviewSessionContent() {
 
   const fetchReviews = async (
     targetLang: string = selectedLanguage,
-    targetMode: "due" | "all" = reviewMode
+    targetMode: "due" | "all" = reviewMode,
+    targetLimit: number = sessionLimit
   ) => {
     setLoading(true);
     setCurrentIndex(0);
     setSessionCompleted(false);
     try {
       const params = new URLSearchParams();
-      params.set("limit", "50");
+      params.set("limit", targetLimit.toString());
       if (targetLang && targetLang !== "ALL") {
         params.set("language", targetLang);
       }
@@ -132,8 +134,8 @@ function ReviewSessionContent() {
   };
 
   useEffect(() => {
-    fetchReviews(selectedLanguage, reviewMode);
-  }, [selectedLanguage, reviewMode]);
+    fetchReviews(selectedLanguage, reviewMode, sessionLimit);
+  }, [selectedLanguage, reviewMode, sessionLimit]);
 
   const handleLanguageChange = (newLang: string) => {
     setSelectedLanguage(newLang);
@@ -361,30 +363,51 @@ function ReviewSessionContent() {
         })}
       </div>
 
-      {/* Due vs All Cards Mode Toggle */}
-      <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-white/5 ml-auto">
-        <button
-          type="button"
-          onClick={() => handleModeChange("due")}
-          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-            reviewMode === "due"
-              ? "bg-indigo-600 text-white"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          Due Today
-        </button>
-        <button
-          type="button"
-          onClick={() => handleModeChange("all")}
-          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-            reviewMode === "all"
-              ? "bg-indigo-600 text-white"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          Practice All
-        </button>
+      {/* Lesson Batch Size & Due/All Mode Toggles */}
+      <div className="flex flex-wrap items-center gap-2 ml-auto">
+        <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-white/5">
+          <span className="text-[10px] text-slate-400 font-semibold px-1.5 uppercase tracking-wider">Lesson:</span>
+          {[5, 8, 15, 25].map((size) => (
+            <button
+              key={size}
+              type="button"
+              onClick={() => setSessionLimit(size)}
+              title={`${size} words per lesson session`}
+              className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                sessionLimit === size
+                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              {size}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-white/5">
+          <button
+            type="button"
+            onClick={() => handleModeChange("due")}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+              reviewMode === "due"
+                ? "bg-indigo-600 text-white"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Due Today
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange("all")}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+              reviewMode === "all"
+                ? "bg-indigo-600 text-white"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Practice All
+          </button>
+        </div>
       </div>
     </div>
   );

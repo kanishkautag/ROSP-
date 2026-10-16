@@ -21,6 +21,11 @@ export async function getWordListById(listId: string, userId: string) {
         include: {
           vocabularyWord: true,
         },
+        orderBy: {
+          vocabularyWord: {
+            frequencyRank: "asc",
+          },
+        },
       },
     },
   });

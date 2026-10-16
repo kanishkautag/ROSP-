@@ -57,6 +57,11 @@ export async function getDueReviews(
           },
         },
         {
+          vocabularyWord: {
+            frequencyRank: "asc",
+          },
+        },
+        {
           createdAt: "desc",
         },
       ],

@@ -309,7 +309,7 @@ export default function VocabularyCatalogPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight text-white">Vocabulary Vault</h1>
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
-                {totalCount > 0 ? `${totalCount.toLocaleString()} words in vault` : "3,264 words in vault"}
+                {totalCount > 0 ? `${totalCount.toLocaleString()} words in vault` : "7,073 words in vault"}
               </span>
             </div>
             <p className="text-sm text-slate-400 mt-1">

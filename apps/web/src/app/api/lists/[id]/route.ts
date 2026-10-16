@@ -20,6 +20,11 @@ export async function GET(
           include: {
             vocabularyWord: true,
           },
+          orderBy: {
+            vocabularyWord: {
+              frequencyRank: "asc",
+            },
+          },
         },
       },
     });
