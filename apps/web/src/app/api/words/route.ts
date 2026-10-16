@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
     const parsedQuery = VocabularyWordQuerySchema.safeParse({
       query: searchParams.get("query") ?? undefined,
       language: searchParams.get("language") ?? undefined,
+      topic: searchParams.get("topic") ?? undefined,
       cefrLevel: searchParams.get("cefrLevel") ?? undefined,
       page: searchParams.get("page") ?? undefined,
       limit: searchParams.get("limit") ?? undefined,

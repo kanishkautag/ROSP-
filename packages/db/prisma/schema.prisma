@@ -7,42 +7,30 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum Algorithm {
-  SM2
-  FSRS
-}
-
-enum ExerciseType {
-  FILL_BLANK
-  MULTIPLE_CHOICE
-  SENTENCE_CONSTRUCTION
-}
-
-enum LLMProvider {
-  OLLAMA
-  GROQ
-}
-
 model User {
-  id             String          @id @default(uuid())
-  email          String          @unique
-  name           String?
-  passwordHash   String?         @map("password_hash")
-  image          String?
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  accounts       Account[]
-  sessions       Session[]
-  wordLists      WordList[]
-  userWords      UserWord[]
-  reviewAttempts ReviewAttempt[]
+  id              String          @id @default(uuid()) @db.Uuid
+  email           String          @unique
+  name            String?
+  passwordHash    String?         @map("password_hash")
+  image           String?
+  timezone        String          @default("Asia/Kolkata")
+  dailyGoal       Int             @default(10) @map("daily_goal")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  accounts        Account[]
+  sessions        Session[]
+  wordLists       WordList[]
+  userWords       UserWord[]
+  reviewAttempts  ReviewAttempt[]
+  dailyActivities DailyActivity[]
+  xpEvents        XpEvent[]
 
   @@map("users")
 }
 
 model Account {
-  id                String  @id @default(uuid())
-  userId            String  @map("user_id")
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @map("user_id") @db.Uuid
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
@@ -61,10 +49,10 @@ model Account {
 }
 
 model Session {
-  id           String   @id @default(uuid())
+  id           String   @id @default(uuid()) @db.Uuid
   sessionToken String   @unique @map("session_token")
-  userId       String   @map("user_id")
-  expires      DateTime
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime @db.Timestamptz(6)
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -72,12 +60,12 @@ model Session {
 }
 
 model WordList {
-  id          String         @id @default(uuid())
-  userId      String         @map("user_id")
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
   name        String
   description String?
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   items       WordListItem[]
 
@@ -86,31 +74,44 @@ model WordList {
 }
 
 model VocabularyWord {
-  id            String         @id @default(uuid())
-  word          String
-  language      String         @default("en")
-  meaning       String         @map("definition")
-  example       String?
-  partOfSpeech  String?        @map("part_of_speech")
-  cefrLevel     String?        @map("cefr_level")
-  frequency     Float?
-  frequencyRank Int?           @map("frequency_rank")
-  source        String?
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  listItems     WordListItem[]
-  userWords     UserWord[]
+  id                 String         @id @default(uuid()) @db.Uuid
+  word               String
+  language           String         @default("en")
+  meaning            String         @map("definition")
+  example            String?
+  synonyms           String[]       @default([])
+  partOfSpeech       String?        @map("part_of_speech")
+  cefrLevel          String?        @map("cefr_level")
+  frequency          Float?
+  frequencyRank      Int?           @map("frequency_rank")
+  source             String?
+  romanization       String?
+  nativeDefinition   String?        @map("native_definition")
+  gender             String?
+  forms              String?
+  exampleTranslation String?        @map("example_translation")
+  topic              String?
+  difficulty         String?
+  pronunciationUrl   String?        @map("pronunciation_url")
+  sourceUrl          String?        @map("source_url")
+  license            String?
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  listItems          WordListItem[]
+  userWords          UserWord[]
 
   @@index([word])
   @@index([language])
+  @@index([topic])
+  @@index([romanization])
   @@map("vocabulary_words")
 }
 
 model WordListItem {
-  id               String         @id @default(uuid())
-  wordListId       String         @map("word_list_id")
-  vocabularyWordId String         @map("vocabulary_word_id")
-  createdAt        DateTime       @default(now()) @map("created_at")
+  id               String         @id @default(uuid()) @db.Uuid
+  wordListId       String         @map("word_list_id") @db.Uuid
+  vocabularyWordId String         @map("vocabulary_word_id") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   wordList         WordList       @relation(fields: [wordListId], references: [id], onDelete: Cascade)
   vocabularyWord   VocabularyWord @relation(fields: [vocabularyWordId], references: [id], onDelete: Cascade)
 
@@ -121,11 +122,11 @@ model WordListItem {
 }
 
 model UserWord {
-  id               String          @id @default(uuid())
-  userId           String          @map("user_id")
-  vocabularyWordId String          @map("vocabulary_word_id")
-  createdAt        DateTime        @default(now()) @map("created_at")
-  updatedAt        DateTime        @updatedAt @map("updated_at")
+  id               String          @id @default(uuid()) @db.Uuid
+  userId           String          @map("user_id") @db.Uuid
+  vocabularyWordId String          @map("vocabulary_word_id") @db.Uuid
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
   user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   vocabularyWord   VocabularyWord  @relation(fields: [vocabularyWordId], references: [id], onDelete: Cascade)
   learningState    LearningState?
@@ -137,9 +138,14 @@ model UserWord {
   @@map("user_words")
 }
 
+enum Algorithm {
+  SM2
+  FSRS
+}
+
 model LearningState {
-  id             String    @id @default(uuid())
-  userWordId     String    @unique @map("user_word_id")
+  id             String    @id @default(uuid()) @db.Uuid
+  userWordId     String    @unique @map("user_word_id") @db.Uuid
   algorithm      Algorithm @default(SM2)
   // SM2 fields
   repetitions    Int?      @default(0)
@@ -150,10 +156,10 @@ model LearningState {
   stability      Float?
   retrievability Float?
   // Scheduling dates
-  lastReviewedAt DateTime? @map("last_reviewed_at")
-  nextReviewAt   DateTime? @map("next_review_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  lastReviewedAt DateTime? @map("last_reviewed_at") @db.Timestamptz(6)
+  nextReviewAt   DateTime? @map("next_review_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   userWord       UserWord  @relation(fields: [userWordId], references: [id], onDelete: Cascade)
 
   @@index([userWordId])
@@ -162,20 +168,19 @@ model LearningState {
 }
 
 model ReviewAttempt {
-  id                 String     @id @default(uuid())
-  userId             String     @map("user_id")
-  userWordId         String     @map("user_word_id")
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String     @map("user_id") @db.Uuid
+  userWordId         String     @map("user_word_id") @db.Uuid
   rating             Int
   correct            Boolean
-  reviewedAt         DateTime   @default(now()) @map("reviewed_at")
+  reviewedAt         DateTime   @default(now()) @map("reviewed_at") @db.Timestamptz(6)
   previousInterval   Float?     @map("previous_interval")
   newInterval        Float?     @map("new_interval")
   previousEaseFactor Float?     @map("previous_ease_factor")
   newEaseFactor      Float?     @map("new_ease_factor")
-  createdAt          DateTime   @default(now()) @map("created_at")
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   userWord           UserWord   @relation(fields: [userWordId], references: [id], onDelete: Cascade)
-  exercises          Exercise[]
 
   @@index([userId])
   @@index([reviewedAt])
@@ -184,18 +189,50 @@ model ReviewAttempt {
 }
 
 model Exercise {
-  id              String        @id @default(uuid())
-  reviewAttemptId String?       @map("review_attempt_id")
-  type            ExerciseType
+  id              String   @id @default(uuid())
+  reviewAttemptId String?  @map("review_attempt_id")
+  type            String
   question        String
   response        String?
   answer          String
   explanation     String?
-  provider        LLMProvider
+  provider        String
   model           String
-  createdAt       DateTime      @default(now()) @map("created_at")
-  reviewAttempt   ReviewAttempt? @relation(fields: [reviewAttemptId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now()) @map("created_at")
 
   @@index([reviewAttemptId])
   @@map("exercises")
+}
+
+model DailyActivity {
+  id                   String    @id @default(uuid()) @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  activityDate         String    @map("activity_date")
+  uniqueWordsReviewed  Int       @default(0) @map("unique_words_reviewed")
+  dailyGoalCompletedAt DateTime? @map("daily_goal_completed_at") @db.Timestamptz(6)
+  xpEarned             Int       @default(0) @map("xp_earned")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, activityDate])
+  @@index([userId])
+  @@index([activityDate])
+  @@map("daily_activities")
+}
+
+model XpEvent {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  amount           Int
+  reason           String
+  idempotencyKey   String   @unique @map("idempotency_key")
+  activityDate     String   @map("activity_date")
+  vocabularyWordId String?  @map("vocabulary_word_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([activityDate])
+  @@map("xp_events")
 }

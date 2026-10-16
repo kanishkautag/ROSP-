@@ -100,7 +100,10 @@ export function DashboardClient({ userName, initialStats }: DashboardClientProps
                 <Flame className="h-4 w-4 fill-current animate-pulse" />
               </div>
               <div>
-                <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Streak</div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Streak</span>
+                  <span className="text-[9px] text-orange-400/80 font-semibold">(Best: {stats.longestStreak}d)</span>
+                </div>
                 <div className="text-base font-extrabold text-orange-400 leading-none">
                   {stats.currentStreak} {stats.currentStreak === 1 ? "day" : "days"}
                 </div>

@@ -12,12 +12,22 @@ interface WordItem {
   id: string;
   word: string;
   language: string;
+  romanization?: string | null;
   meaning: string;
+  nativeDefinition?: string | null;
+  gender?: string | null;
+  forms?: string | null;
   example?: string | null;
+  exampleTranslation?: string | null;
+  topic?: string | null;
+  difficulty?: string | null;
   partOfSpeech?: string | null;
   cefrLevel?: string | null;
   frequencyRank?: number | null;
   source?: string | null;
+  sourceUrl?: string | null;
+  license?: string | null;
+  pronunciationUrl?: string | null;
 }
 
 interface UserList {
@@ -46,6 +56,7 @@ export default function VocabularyCatalogPage() {
   const [query, setQuery] = useState("");
   const [selectedCefr, setSelectedCefr] = useState<string>("ALL");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("ALL");
+  const [selectedTopic, setSelectedTopic] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
 
   // Online Oxford / AI Dictionary State
@@ -72,6 +83,18 @@ export default function VocabularyCatalogPage() {
   const [customLanguage, setCustomLanguage] = useState("en");
 
   const cefrLevels = ["ALL", "A1", "A2", "B1", "B2", "C1", "C2"];
+  const topics = [
+    "ALL",
+    "greetings",
+    "family",
+    "food",
+    "travel",
+    "numbers",
+    "daily conversation",
+    "common verbs",
+    "college",
+    "shopping",
+  ];
 
   const fetchWords = async (explicitQuery?: string) => {
     const q = explicitQuery !== undefined ? explicitQuery : query;
@@ -81,6 +104,7 @@ export default function VocabularyCatalogPage() {
       if (q.trim()) params.append("query", q.trim());
       if (selectedCefr !== "ALL") params.append("cefrLevel", selectedCefr);
       if (selectedLanguage !== "ALL") params.append("language", selectedLanguage);
+      if (selectedTopic !== "ALL") params.append("topic", selectedTopic);
 
       const res = await fetch(`/api/words?${params.toString()}`);
       if (res.ok) {
@@ -178,7 +202,7 @@ export default function VocabularyCatalogPage() {
   useEffect(() => {
     fetchWords();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCefr, selectedLanguage]);
+  }, [selectedCefr, selectedLanguage, selectedTopic]);
 
   useEffect(() => {
     fetchUserLists();
@@ -325,8 +349,9 @@ export default function VocabularyCatalogPage() {
             </span>
             {[
               { id: "ALL", label: "All Languages" },
-              { id: "en", label: "English 🇬🇧" },
               { id: "hi", label: "Hindi 🇮🇳 (हिंदी)" },
+              { id: "mr", label: "Marathi 🇮🇳 (मराठी)" },
+              { id: "en", label: "English 🇬🇧" },
             ].map((lang) => (
               <button
                 key={lang.id}
@@ -357,6 +382,26 @@ export default function VocabularyCatalogPage() {
                 }`}
               >
                 {lvl}
+              </button>
+            ))}
+          </div>
+
+          {/* Topics */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800/60">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">
+              Topic:
+            </span>
+            {topics.map((t) => (
+              <button
+                key={t}
+                onClick={() => setSelectedTopic(t)}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-medium capitalize transition-all cursor-pointer ${
+                  selectedTopic === t
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
+                }`}
+              >
+                {t}
               </button>
             ))}
           </div>
@@ -545,13 +590,28 @@ export default function VocabularyCatalogPage() {
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
                         {item.partOfSpeech || "word"}
                       </span>
                       {item.language === "hi" && (
                         <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 text-[10px] font-bold border border-amber-500/20">
                           हिंदी
+                        </span>
+                      )}
+                      {item.language === "mr" && (
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300 text-[10px] font-bold border border-emerald-500/20">
+                          मराठी
+                        </span>
+                      )}
+                      {item.gender && (
+                        <span className="px-1.5 py-0.2 rounded bg-pink-500/10 text-pink-300 text-[10px] font-medium border border-pink-500/20">
+                          {item.gender}
+                        </span>
+                      )}
+                      {item.topic && (
+                        <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 text-[10px] border border-slate-700">
+                          {item.topic}
                         </span>
                       )}
                     </div>
@@ -561,39 +621,59 @@ export default function VocabularyCatalogPage() {
                           {item.cefrLevel}
                         </span>
                       )}
-                      {item.frequencyRank && (
-                        <span className="text-[10px] text-slate-500">
-                          #{item.frequencyRank}
+                      {item.difficulty && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px]">
+                          {item.difficulty}
                         </span>
                       )}
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-2xl font-extrabold text-white tracking-tight group-hover:text-indigo-200 transition-colors">
-                      {item.word}
-                    </h3>
+                    <div>
+                      <h3 className="text-2xl font-extrabold text-white tracking-tight group-hover:text-indigo-200 transition-colors">
+                        {item.word}
+                      </h3>
+                      {item.romanization && (
+                        <p className="text-xs font-mono text-indigo-300/80 mt-0.5">
+                          {item.romanization}
+                        </p>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        speakWord(item.word, item.language);
+                        speakWord(item.word, item.language, item.pronunciationUrl);
                       }}
                       className="p-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-indigo-500/50 hover:bg-slate-800 text-indigo-400 hover:text-white transition-all cursor-pointer shadow-sm"
-                      title={`Pronounce (${item.language === "hi" ? "Hindi" : "English"})`}
+                      title={`Pronounce (${item.language === "hi" ? "Hindi" : item.language === "mr" ? "Marathi" : "English"})`}
                     >
                       <Volume2 className="h-4 w-4" />
                     </button>
                   </div>
 
-                  <p className="text-xs text-slate-300 mb-4 line-clamp-3 leading-relaxed">
+                  <p className="text-xs text-slate-300 mb-2 line-clamp-3 leading-relaxed">
                     {item.meaning}
                   </p>
 
-                  {item.example && (
-                    <p className="text-xs text-slate-400 italic mb-4 border-l-2 border-indigo-500/30 pl-3">
-                      &quot;{item.example}&quot;
+                  {item.nativeDefinition && (
+                    <p className="text-xs text-slate-400 mb-3 italic">
+                      {item.nativeDefinition}
                     </p>
+                  )}
+
+                  {item.example && (
+                    <div className="mb-4 border-l-2 border-indigo-500/30 pl-3 py-0.5">
+                      <p className="text-xs text-slate-300 italic">
+                        &quot;{item.example}&quot;
+                      </p>
+                      {item.exampleTranslation && (
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {item.exampleTranslation}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -728,13 +808,25 @@ export default function VocabularyCatalogPage() {
                   className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Language</label>
+                  <select
+                    value={customLanguage}
+                    onChange={(e) => setCustomLanguage(e.target.value)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-2 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                  >
+                    <option value="en">English (en)</option>
+                    <option value="hi">Hindi (hi)</option>
+                    <option value="mr">Marathi (mr)</option>
+                  </select>
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">Part of Speech</label>
                   <select
                     value={customPos}
                     onChange={(e) => setCustomPos(e.target.value)}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-2 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
                   >
                     <option value="noun">noun</option>
                     <option value="verb">verb</option>
@@ -748,7 +840,7 @@ export default function VocabularyCatalogPage() {
                   <select
                     value={customCefr}
                     onChange={(e) => setCustomCefr(e.target.value)}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-2 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
                   >
                     <option value="A1">A1</option>
                     <option value="A2">A2</option>

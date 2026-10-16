@@ -2,18 +2,26 @@ import prisma from "@rosp/db";
 import { CreateVocabularyWordInput, VocabularyWordQueryParams } from "@rosp/shared";
 
 export async function searchVocabularyWords(params: VocabularyWordQueryParams) {
-  const { query, language, cefrLevel, page = 1, limit = 20 } = params;
+  const { query, language, topic, cefrLevel, page = 1, limit = 20 } = params;
   const skip = (page - 1) * limit;
 
-  const where = {
-    ...(query && {
+  // Unicode normalize search query (NFC standard for Indic Devanagari scripts and Latin)
+  const normalizedQuery = query ? query.normalize("NFC").trim() : undefined;
+
+  const where: any = {
+    ...(normalizedQuery && {
       OR: [
-        { word: { contains: query, mode: "insensitive" as const } },
-        { meaning: { contains: query, mode: "insensitive" as const } },
+        { word: { contains: normalizedQuery, mode: "insensitive" } },
+        { meaning: { contains: normalizedQuery, mode: "insensitive" } },
+        { romanization: { contains: normalizedQuery, mode: "insensitive" } },
+        { nativeDefinition: { contains: normalizedQuery, mode: "insensitive" } },
+        { example: { contains: normalizedQuery, mode: "insensitive" } },
+        { exampleTranslation: { contains: normalizedQuery, mode: "insensitive" } },
       ],
     }),
-    ...(language && { language }),
-    ...(cefrLevel && { cefrLevel }),
+    ...(language && language !== "ALL" && { language }),
+    ...(topic && topic !== "ALL" && { topic }),
+    ...(cefrLevel && (cefrLevel as string) !== "ALL" && { cefrLevel }),
   };
 
   const [words, total] = await Promise.all([
@@ -21,7 +29,7 @@ export async function searchVocabularyWords(params: VocabularyWordQueryParams) {
       where,
       skip,
       take: limit,
-      orderBy: { word: "asc" },
+      orderBy: [{ topic: "asc" }, { word: "asc" }],
     }),
     prisma.vocabularyWord.count({ where }),
   ]);
@@ -41,17 +49,31 @@ export async function getVocabularyWordById(id: string) {
 }
 
 export async function createVocabularyWord(data: CreateVocabularyWordInput) {
+  const normalizedWord = data.word.normalize("NFC").trim();
+  const normalizedMeaning = data.meaning.trim();
+
   return prisma.vocabularyWord.create({
     data: {
-      word: data.word,
+      word: normalizedWord,
       language: data.language,
-      meaning: data.meaning,
-      example: data.example,
-      partOfSpeech: data.partOfSpeech,
-      cefrLevel: data.cefrLevel,
-      frequency: data.frequency,
-      frequencyRank: data.frequencyRank,
-      source: data.source,
+      meaning: normalizedMeaning,
+      example: data.example ? data.example.normalize("NFC").trim() : null,
+      synonyms: data.synonyms || [],
+      partOfSpeech: data.partOfSpeech || null,
+      cefrLevel: data.cefrLevel || null,
+      frequency: data.frequency ?? null,
+      frequencyRank: data.frequencyRank ?? null,
+      source: data.source || null,
+      romanization: data.romanization ? data.romanization.trim() : null,
+      nativeDefinition: data.nativeDefinition ? data.nativeDefinition.normalize("NFC").trim() : null,
+      gender: data.gender || null,
+      forms: data.forms || null,
+      exampleTranslation: data.exampleTranslation ? data.exampleTranslation.trim() : null,
+      topic: data.topic || null,
+      difficulty: data.difficulty || null,
+      pronunciationUrl: data.pronunciationUrl || null,
+      sourceUrl: data.sourceUrl || null,
+      license: data.license || null,
     },
   });
 }

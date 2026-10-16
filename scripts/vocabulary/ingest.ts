@@ -1,97 +1,143 @@
+import { MULTILINGUAL_LEXICON } from "./curated_lexicon";
 import { VOCABULARY_DATASET } from "./dataset";
 import prisma from "../../packages/db/client";
 
-async function runIngestion() {
-  console.log("=== ROSP Vocabulary Ingestion Pipeline ===");
-  console.log(`Processing ${VOCABULARY_DATASET.length} normalized lexical items...`);
+export async function runIngestion() {
+  console.log("=== ROSP Multi-language Vocabulary Ingestion Pipeline ===");
 
-  let added = 0;
-  let updated = 0;
+  // 1. Fetch all existing vocabulary words in ONE fast query
+  const existingWords = await prisma.vocabularyWord.findMany({
+    select: { id: true, word: true, language: true },
+  });
+  const wordMap = new Map<string, string>();
+  for (const w of existingWords) {
+    wordMap.set(`${w.language}:${w.word.normalize("NFC").trim()}`, w.id);
+  }
+  console.log(`Found ${existingWords.length} existing vocabulary words in vault.`);
 
-  for (const item of VOCABULARY_DATASET) {
-    try {
-      const existing = await prisma.vocabularyWord.findFirst({
-        where: {
-          word: item.word,
-          language: item.language,
-        },
-      });
+  // 2. Prepare Curated Multilingual Lexicon items
+  const newCuratedItems: any[] = [];
+  const updateCuratedItems: { id: string; data: any }[] = [];
 
-      if (!existing) {
-        await prisma.vocabularyWord.create({
-          data: {
-            word: item.word,
-            language: item.language,
-            meaning: item.definition,
-            example: item.example,
-            partOfSpeech: item.partOfSpeech,
-            cefrLevel: item.cefrLevel,
-            frequency: item.frequency,
-            frequencyRank: item.frequencyRank,
-            source: item.source,
-          },
-        });
-        added++;
-      } else {
-        await prisma.vocabularyWord.update({
-          where: { id: existing.id },
-          data: {
-            meaning: item.definition,
-            example: item.example,
-            partOfSpeech: item.partOfSpeech,
-            cefrLevel: item.cefrLevel,
-            frequency: item.frequency,
-            frequencyRank: item.frequencyRank,
-            source: item.source,
-          },
-        });
-        updated++;
-      }
-    } catch (err) {
-      console.error(`Error processing word "${item.word}":`, err);
+  for (const item of MULTILINGUAL_LEXICON) {
+    const normalizedWord = item.word.normalize("NFC").trim();
+    const key = `${item.language}:${normalizedWord}`;
+    const existingId = wordMap.get(key);
+
+    const payload = {
+      word: normalizedWord,
+      language: item.language,
+      meaning: item.meaning.trim(),
+      example: item.example.normalize("NFC").trim(),
+      partOfSpeech: item.partOfSpeech,
+      cefrLevel: item.difficulty,
+      difficulty: item.difficulty,
+      romanization: item.romanization,
+      nativeDefinition: item.nativeDefinition.normalize("NFC").trim(),
+      gender: item.gender,
+      forms: item.forms,
+      exampleTranslation: item.exampleTranslation,
+      topic: item.topic,
+      pronunciationUrl: item.pronunciationUrl,
+      source: item.source,
+      sourceUrl: item.sourceUrl,
+      license: item.license,
+    };
+
+    if (!existingId) {
+      newCuratedItems.push(payload);
+    } else {
+      updateCuratedItems.push({ id: existingId, data: payload });
     }
   }
 
-  console.log(`Canonical vocabulary sync completed:`);
-  console.log(`- New words added: ${added}`);
-  console.log(`- Existing words refreshed: ${updated}`);
+  // Batch insert new curated items
+  if (newCuratedItems.length > 0) {
+    console.log(`Batch inserting ${newCuratedItems.length} new curated items...`);
+    await prisma.vocabularyWord.createMany({
+      data: newCuratedItems,
+      skipDuplicates: true,
+    });
+  }
 
-  // Fetch all vocabulary words to create an ID map
-  const allVocab = await prisma.vocabularyWord.findMany({
-    select: { id: true, word: true, source: true },
+  // Update existing curated items sequentially to respect connection_limit=1
+  if (updateCuratedItems.length > 0) {
+    console.log(`Updating ${updateCuratedItems.length} existing curated items with rich metadata...`);
+    for (const item of updateCuratedItems) {
+      await prisma.vocabularyWord.update({
+        where: { id: item.id },
+        data: item.data,
+      });
+    }
+  }
+
+  // 3. Batch insert new legacy dataset items if any missing
+  const newDatasetItems: any[] = [];
+  for (const item of VOCABULARY_DATASET) {
+    const normalizedWord = item.word.normalize("NFC").trim();
+    const key = `${item.language}:${normalizedWord}`;
+    if (!wordMap.has(key)) {
+      newDatasetItems.push({
+        word: normalizedWord,
+        language: item.language,
+        meaning: item.definition,
+        example: item.example ? item.example.normalize("NFC").trim() : null,
+        partOfSpeech: item.partOfSpeech,
+        cefrLevel: item.cefrLevel,
+        frequency: item.frequency,
+        frequencyRank: item.frequencyRank,
+        source: item.source,
+      });
+      wordMap.set(key, "temp");
+    }
+  }
+
+  if (newDatasetItems.length > 0) {
+    console.log(`Batch inserting ${newDatasetItems.length} new dataset items...`);
+    await prisma.vocabularyWord.createMany({
+      data: newDatasetItems,
+      skipDuplicates: true,
+    });
+  }
+
+  // 4. Report total counts per language
+  const counts = await prisma.vocabularyWord.groupBy({
+    by: ["language"],
+    _count: { id: true },
   });
-  const vocabMap = new Map(allVocab.map((v) => [v.word, v.id]));
+  console.log("Current vocabulary counts by language in vault:", counts);
 
-  // Curate starter decks for all registered users
+  // 5. Curate distinct starter decks for all registered users
   const users = await prisma.user.findMany({ select: { id: true, email: true } });
-  console.log(`Populating curated decks for ${users.length} user(s)...`);
+  console.log(`Populating curated decks across ${users.length} user(s)...`);
 
   const curatedDecks = [
     {
-      name: "GRE High-Frequency 333",
-      description: "Essential high-yield vocabulary tested frequently on GRE Verbal Reasoning.",
-      filterSource: "GRE High-Frequency",
-    },
-    {
-      name: "TOEFL Academic Word List",
-      description: "Core academic lexicon for TOEFL iBT reading, listening, and speaking.",
-      filterSource: "TOEFL Academic",
-    },
-    {
-      name: "IELTS Band 8+ Masterclass",
-      description: "Sophisticated vocabulary and collocations to reach band 8.0-9.0 in IELTS.",
-      filterSource: "IELTS Band 8+",
-    },
-    {
       name: "Hindi Essentials & Conversational (हिंदी)",
       description: "Core Hindi vocabulary, common idioms, and daily conversational expressions.",
-      filterSource: "Hindi Essentials (हिंदी)",
+      language: "hi",
+    },
+    {
+      name: "Marathi Native Lexicon & Grammar (मराठी)",
+      description: "Authentic Marathi vocabulary with gender, verb forms, and cultural expressions.",
+      language: "mr",
+    },
+    {
+      name: "English Academic & Conversational (English)",
+      description: "Essential academic and conversational lexicon for proficient English learners.",
+      language: "en",
     },
   ];
 
-  for (const user of users) {
-    for (const deck of curatedDecks) {
-      // Find or create wordList
+  for (const deck of curatedDecks) {
+    const deckWords = await prisma.vocabularyWord.findMany({
+      where: { language: deck.language },
+      select: { id: true },
+    });
+    const deckVocabIds = deckWords.map((w) => w.id);
+    if (deckVocabIds.length === 0) continue;
+
+    for (const user of users) {
       let list = await prisma.wordList.findFirst({
         where: { userId: user.id, name: deck.name },
       });
@@ -106,14 +152,7 @@ async function runIngestion() {
         });
       }
 
-      // Words belonging to this deck source
-      const deckVocabIds = allVocab
-        .filter((w) => w.source === deck.filterSource)
-        .map((w) => w.id);
-
-      if (deckVocabIds.length === 0) continue;
-
-      // Existing list items
+      // Link words to list
       const existingItems = await prisma.wordListItem.findMany({
         where: { wordListId: list.id },
         select: { vocabularyWordId: true },
@@ -156,46 +195,39 @@ async function runIngestion() {
       }
 
       // Ensure LearningState exists for all UserWord records
-      const allUserWordsForDeck = await prisma.userWord.findMany({
-        where: { userId: user.id, vocabularyWordId: { in: deckVocabIds } },
+      const userWordsWithoutState = await prisma.userWord.findMany({
+        where: {
+          userId: user.id,
+          vocabularyWordId: { in: deckVocabIds },
+          learningState: null,
+        },
         select: { id: true },
       });
 
-      const existingStates = await prisma.learningState.findMany({
-        where: { userWordId: { in: allUserWordsForDeck.map((u) => u.id) } },
-        select: { userWordId: true },
-      });
-      const existingStateIds = new Set(existingStates.map((s) => s.userWordId));
-
-      const statesToCreate = allUserWordsForDeck
-        .filter((u) => !existingStateIds.has(u.id))
-        .map((u) => ({
-          userWordId: u.id,
-          algorithm: "SM2" as const,
-          repetitions: 0,
-          interval: 1.0,
-          easeFactor: 2.5,
-          nextReviewAt: new Date(),
-        }));
-
-      if (statesToCreate.length > 0) {
+      if (userWordsWithoutState.length > 0) {
         await prisma.learningState.createMany({
-          data: statesToCreate,
+          data: userWordsWithoutState.map((uw) => ({
+            userWordId: uw.id,
+            algorithm: "SM2",
+            repetitions: 0,
+            interval: 1.0,
+            easeFactor: 2.5,
+            nextReviewAt: new Date(),
+          })),
           skipDuplicates: true,
         });
       }
     }
   }
 
-  console.log("Curated decks synchronized successfully.");
+  console.log("=== Multi-language ingestion pipeline completed successfully! ===");
 }
 
 runIngestion()
-  .catch((e) => {
-    console.error("Ingestion failed:", e);
+  .catch((err) => {
+    console.error("Ingestion failed:", err);
     process.exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();
-    process.exit(0);
   });

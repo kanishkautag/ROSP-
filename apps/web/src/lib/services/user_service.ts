@@ -1,4 +1,5 @@
 import prisma from "@rosp/db";
+import { getUserGamificationStats } from "./xp_service";
 
 export interface WeakWordItem {
   id: string;
@@ -27,6 +28,7 @@ export interface DashboardStats {
   reviewsCompletedToday: number;
   dailyGoal: number;
   currentStreak: number;
+  longestStreak: number;
   xp: number;
   level: number;
   xpInCurrentLevel: number;
@@ -145,38 +147,8 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
     }),
   ]);
 
-  // Streak Calculation
-  const dateSet = new Set<string>();
-  for (const r of reviewDates) {
-    dateSet.add(r.reviewedAt.toISOString().slice(0, 10));
-  }
-
-  const todayStr = now.toISOString().slice(0, 10);
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().slice(0, 10);
-
-  let currentStreak = 0;
-  let checkDate = new Date(now);
-
-  if (dateSet.has(todayStr)) {
-    while (dateSet.has(checkDate.toISOString().slice(0, 10))) {
-      currentStreak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-  } else if (dateSet.has(yesterdayStr)) {
-    checkDate = yesterday;
-    while (dateSet.has(checkDate.toISOString().slice(0, 10))) {
-      currentStreak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-  }
-
-  // Gamification: XP & Level
-  const xp = totalReviews * 15 + currentStreak * 30;
-  const level = Math.floor(xp / 100) + 1;
-  const xpInCurrentLevel = xp % 100;
-  const xpNeededForNextLevel = 100;
+  // Server-side deterministic Gamification, XP & Streak calculation
+  const gamification = await getUserGamificationStats(userId);
 
   // Retention rate
   const retentionRate =
@@ -225,12 +197,13 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
     totalWords,
     wordsLearned,
     reviewsCompletedToday,
-    dailyGoal: 20,
-    currentStreak,
-    xp,
-    level,
-    xpInCurrentLevel,
-    xpNeededForNextLevel,
+    dailyGoal: gamification.dailyGoal,
+    currentStreak: gamification.currentStreak,
+    longestStreak: gamification.longestStreak,
+    xp: gamification.totalXp,
+    level: gamification.level,
+    xpInCurrentLevel: gamification.xpInCurrentLevel,
+    xpNeededForNextLevel: gamification.xpNeededForNextLevel,
     retentionRate,
     weakWords,
     recommendedWords,

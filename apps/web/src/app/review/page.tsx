@@ -15,10 +15,18 @@ interface VocabularyWord {
   id: string;
   word: string;
   language: string;
+  romanization?: string | null;
   meaning: string;
+  nativeDefinition?: string | null;
+  gender?: string | null;
+  forms?: string | null;
   example?: string | null;
+  exampleTranslation?: string | null;
+  topic?: string | null;
+  difficulty?: string | null;
   partOfSpeech?: string | null;
   cefrLevel?: string | null;
+  pronunciationUrl?: string | null;
 }
 
 interface LearningState {
@@ -46,6 +54,7 @@ interface Exercise {
 const LANGUAGE_CONFIG: Record<string, { label: string; flag: string }> = {
   ALL: { label: "All Languages", flag: "🌐" },
   hi: { label: "Hindi (हिंदी)", flag: "🇮🇳" },
+  mr: { label: "Marathi (मराठी)", flag: "🇮🇳" },
   en: { label: "English", flag: "🇬🇧" },
   es: { label: "Spanish", flag: "🇪🇸" },
   fr: { label: "French", flag: "🇫🇷" },
@@ -469,6 +478,17 @@ function ReviewSessionContent() {
               </button>
             ) : null}
 
+            {selectedLanguage !== "mr" && countsByLanguage["mr"]?.total ? (
+              <button
+                type="button"
+                onClick={() => handleLanguageChange("mr")}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-500 transition-all cursor-pointer"
+              >
+                <span>🇮🇳</span>
+                Review Marathi ({countsByLanguage["mr"]?.due || countsByLanguage["mr"]?.total})
+              </button>
+            ) : null}
+
             {selectedLanguage !== "en" && countsByLanguage["en"]?.total ? (
               <button
                 type="button"
@@ -560,9 +580,21 @@ function ReviewSessionContent() {
 
             {/* Language Flag Badge */}
             <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-200 text-[10px] font-bold border border-white/5 flex items-center gap-1">
-              <span>{isHindiWord ? "🇮🇳" : "🇬🇧"}</span>
-              <span>{isHindiWord ? "Hindi" : "English"}</span>
+              <span>{currentCard?.vocabularyWord.language === "hi" ? "🇮🇳" : currentCard?.vocabularyWord.language === "mr" ? "🇮🇳" : "🇬🇧"}</span>
+              <span>{currentCard?.vocabularyWord.language === "hi" ? "Hindi" : currentCard?.vocabularyWord.language === "mr" ? "Marathi" : "English"}</span>
             </span>
+
+            {currentCard?.vocabularyWord.topic && (
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-700">
+                {currentCard.vocabularyWord.topic}
+              </span>
+            )}
+
+            {currentCard?.vocabularyWord.gender && (
+              <span className="px-2 py-0.5 rounded-md bg-pink-500/10 text-pink-300 text-[10px] font-medium border border-pink-500/20">
+                {currentCard.vocabularyWord.gender}
+              </span>
+            )}
 
             {currentCard?.vocabularyWord.cefrLevel && (
               <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-bold">
@@ -593,9 +625,25 @@ function ReviewSessionContent() {
             <div className="space-y-4">
               {/* Question Banner */}
               <div className="text-sm font-semibold text-slate-200 leading-relaxed bg-slate-950/70 p-5 rounded-2xl border border-white/5 whitespace-pre-wrap">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 block mb-1.5">
-                  Context Question • {currentCard?.vocabularyWord.partOfSpeech || "Vocabulary Word"}
-                </span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400">
+                    Context Question • {currentCard?.vocabularyWord.partOfSpeech || "Vocabulary Word"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      speakWord(
+                        currentCard?.vocabularyWord.word || "",
+                        currentCard?.vocabularyWord.language,
+                        currentCard?.vocabularyWord.pronunciationUrl
+                      )
+                    }
+                    title="Pronounce prompt word"
+                    className="p-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-indigo-500/50 hover:bg-slate-800 text-indigo-400 hover:text-white transition-all cursor-pointer shadow-sm"
+                  >
+                    <Volume2 className="h-4 w-4" />
+                  </button>
+                </div>
                 {exercise.question}
               </div>
 
@@ -810,27 +858,41 @@ function ReviewSessionContent() {
               </span>
 
               <div className="flex items-center justify-center gap-3 mb-2">
-                <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                  {currentCard?.vocabularyWord.word}
-                </h2>
+                <div>
+                  <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                    {currentCard?.vocabularyWord.word}
+                  </h2>
+                  {currentCard?.vocabularyWord.romanization && (
+                    <p className="text-sm font-mono text-indigo-300 mt-1">
+                      {currentCard?.vocabularyWord.romanization}
+                    </p>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() =>
                     speakWord(
                       currentCard?.vocabularyWord.word || "",
-                      currentCard?.vocabularyWord.language
+                      currentCard?.vocabularyWord.language,
+                      currentCard?.vocabularyWord.pronunciationUrl
                     )
                   }
-                  title={`Listen to pronunciation (${isHindiWord ? "Hindi" : "English"})`}
+                  title={`Listen to pronunciation (${currentCard?.vocabularyWord.language === "hi" ? "Hindi" : currentCard?.vocabularyWord.language === "mr" ? "Marathi" : "English"})`}
                   className="h-10 w-10 rounded-2xl bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/40 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-indigo-500/30 active:scale-95"
                 >
                   <Volume2 className="h-5 w-5" />
                 </button>
               </div>
 
-              <p className="text-sm text-slate-300 max-w-md mx-auto leading-relaxed mb-3">
+              <p className="text-sm text-slate-300 max-w-md mx-auto leading-relaxed mb-2">
                 {currentCard?.vocabularyWord.meaning}
               </p>
+
+              {currentCard?.vocabularyWord.nativeDefinition && (
+                <p className="text-xs text-slate-400 italic mb-3">
+                  {currentCard.vocabularyWord.nativeDefinition}
+                </p>
+              )}
 
               {currentCard?.vocabularyWord.example && (
                 <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5 text-left max-w-lg mx-auto">
@@ -840,6 +902,11 @@ function ReviewSessionContent() {
                   <p className="text-xs text-slate-200 italic leading-relaxed">
                     &ldquo;{currentCard.vocabularyWord.example}&rdquo;
                   </p>
+                  {currentCard.vocabularyWord.exampleTranslation && (
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {currentCard.vocabularyWord.exampleTranslation}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

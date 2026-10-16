@@ -73,10 +73,11 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       }
     }
 
-    // In development mode, if no active cookie session is set, fallback to the dev user
+    // In development mode, if no active cookie session is set, fallback to demo or dev user
     if (process.env.NODE_ENV !== "production") {
       const devUser = await prisma.user.findFirst({
-        where: { email: "dev@rosp.local" },
+        where: { email: { in: ["demo@rosp.local", "dev@rosp.local"] } },
+        orderBy: { email: "asc" }, // "demo@rosp.local" comes before "dev@rosp.local"
       });
       if (devUser) {
         return {

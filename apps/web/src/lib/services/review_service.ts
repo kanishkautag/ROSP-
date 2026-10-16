@@ -1,6 +1,7 @@
 import prisma from "@rosp/db";
 import { ReviewSubmissionInput } from "@rosp/shared";
 import { LearningAlgorithmFactory } from "../learning/learning_algorithm_factory";
+import { recordReviewActivityAndXp } from "./xp_service";
 
 export async function getDueReviews(
   userId: string,
@@ -150,6 +151,14 @@ export async function processReviewSubmission(
     }
   }
 
+  // Record daily activity, streaks, and XP events deterministically
+  const xpResult = await recordReviewActivityAndXp(
+    userId,
+    userWord.vocabularyWordId,
+    reviewAttempt.correct,
+    reviewAttempt.reviewedAt
+  );
+
   // Update learning state
   const updatedState = await prisma.learningState.upsert({
     where: { userWordId: userWord.id },
@@ -181,5 +190,6 @@ export async function processReviewSubmission(
     reviewAttempt,
     learningState: updatedState,
     scheduleResult,
+    xpResult,
   };
 }

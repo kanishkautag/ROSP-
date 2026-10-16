@@ -14,6 +14,7 @@ export default async function DashboardPage() {
     reviewsCompletedToday: 0,
     dailyGoal: 20,
     currentStreak: 0,
+    longestStreak: 0,
     xp: 0,
     level: 1,
     xpInCurrentLevel: 0,
