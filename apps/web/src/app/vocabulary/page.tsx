@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Search, Filter, Plus, BookOpen, Sparkles, Check,
-  FolderPlus, ArrowLeft, Volume2, Tag, Layers, Globe, X
+  FolderPlus, ArrowLeft, Volume2, Tag, Layers, Globe, X,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 import { speakWord } from "@/lib/utils/tts";
 
@@ -82,6 +83,11 @@ export default function VocabularyCatalogPage() {
   const [customCefr, setCustomCefr] = useState("B1");
   const [customLanguage, setCustomLanguage] = useState("en");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(24);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   const cefrLevels = ["ALL", "A1", "A2", "B1", "B2", "C1", "C2"];
   const topics = [
     "ALL",
@@ -96,8 +102,9 @@ export default function VocabularyCatalogPage() {
     "shopping",
   ];
 
-  const fetchWords = async (explicitQuery?: string) => {
+  const fetchWords = async (explicitQuery?: string, pageToFetch?: number) => {
     const q = explicitQuery !== undefined ? explicitQuery : query;
+    const p = pageToFetch !== undefined ? pageToFetch : currentPage;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -105,12 +112,17 @@ export default function VocabularyCatalogPage() {
       if (selectedCefr !== "ALL") params.append("cefrLevel", selectedCefr);
       if (selectedLanguage !== "ALL") params.append("language", selectedLanguage);
       if (selectedTopic !== "ALL") params.append("topic", selectedTopic);
+      params.append("page", String(p));
+      params.append("limit", String(pageSize));
 
       const res = await fetch(`/api/words?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         const found = data.words || [];
         setWords(found);
+        setTotalCount(data.total ?? found.length);
+        setTotalPages(data.totalPages ?? 1);
+        setCurrentPage(data.page ?? p);
 
         // If local database has 0 matches for a query, automatically look up in Oxford / AI Open Dictionary!
         if (found.length === 0 && q.trim()) {
@@ -200,9 +212,10 @@ export default function VocabularyCatalogPage() {
   };
 
   useEffect(() => {
-    fetchWords();
+    setCurrentPage(1);
+    fetchWords(undefined, 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCefr, selectedLanguage, selectedTopic]);
+  }, [selectedCefr, selectedLanguage, selectedTopic, pageSize]);
 
   useEffect(() => {
     fetchUserLists();
@@ -293,7 +306,12 @@ export default function VocabularyCatalogPage() {
         </Link>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Vocabulary Vault</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight text-white">Vocabulary Vault</h1>
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                {totalCount > 0 ? `${totalCount.toLocaleString()} words in vault` : "3,264 words in vault"}
+              </span>
+            </div>
             <p className="text-sm text-slate-400 mt-1">
               Search canonical vocabulary, filter by CEFR levels, and save items to study lists.
             </p>
@@ -693,6 +711,67 @@ export default function VocabularyCatalogPage() {
               </div>
             ))}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-white/10">
+              <div className="text-xs text-slate-400">
+                Showing <span className="font-semibold text-white">{(currentPage - 1) * pageSize + 1}</span> to{" "}
+                <span className="font-semibold text-white">
+                  {Math.min(currentPage * pageSize, totalCount)}
+                </span>{" "}
+                of <span className="font-semibold text-white">{totalCount}</span> vocabulary items
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (currentPage > 1) {
+                      const nextP = currentPage - 1;
+                      setCurrentPage(nextP);
+                      fetchWords(undefined, nextP);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                  }}
+                  disabled={currentPage <= 1 || loading}
+                  className="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-900 text-xs font-medium text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </button>
+
+                <div className="text-xs font-semibold text-indigo-300 px-3 py-1.5 rounded-xl bg-indigo-950/60 border border-indigo-500/30">
+                  Page {currentPage} of {totalPages}
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (currentPage < totalPages) {
+                      const nextP = currentPage + 1;
+                      setCurrentPage(nextP);
+                      fetchWords(undefined, nextP);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                  }}
+                  disabled={currentPage >= totalPages || loading}
+                  className="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-900 text-xs font-medium text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="ml-2 rounded-xl border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none cursor-pointer"
+                >
+                  <option value={24}>24 / page</option>
+                  <option value={48}>48 / page</option>
+                  <option value={96}>96 / page</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         !onlineSearching && !onlineEntry && (
