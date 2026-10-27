@@ -1,12 +1,14 @@
-import { getLLMConfig, LLMConfig, LLMProviderType } from "./llm_config";
+import { getLLMConfig, getOpenRouterConfig, LLMConfig, LLMProviderType } from "./llm_config";
 import { LLMProvider, ExercisePromptPayload, GeneratedExerciseResult } from "./llm_provider";
 import { OllamaProvider } from "./ollama";
 import { GroqProvider } from "./groq";
+import { OpenRouterProvider } from "./openrouter";
 import { generateFallbackExercise } from "./fallback_generator";
 
 /**
  * Service that encapsulates LLM operations and provider selection.
- * Always guarantees exercise generation via deterministic fallback if LLM is unavailable.
+ * Cascades from Primary (Groq) -> Secondary Fallback (OpenRouter / Nemotron) -> Deterministic fallback.
+ * Always guarantees exercise generation via deterministic fallback if LLMs are unavailable.
  */
 export class LLMService {
   private static instance: LLMService;
@@ -22,11 +24,23 @@ export class LLMService {
 
   private getActive(): { provider: LLMProvider; config: LLMConfig } {
     const config = getLLMConfig();
-    const provider =
-      config.provider === LLMProviderType.GROQ && config.apiKey
-        ? new GroqProvider(config)
-        : new OllamaProvider(config);
+    let provider: LLMProvider;
+    if (config.provider === LLMProviderType.OPENROUTER && config.apiKey) {
+      provider = new OpenRouterProvider(config);
+    } else if (config.provider === LLMProviderType.GROQ && config.apiKey) {
+      provider = new GroqProvider(config);
+    } else {
+      provider = new OllamaProvider(config);
+    }
     return { provider, config };
+  }
+
+  private getOpenRouterFallback(): LLMProvider | null {
+    const openRouterConfig = getOpenRouterConfig();
+    if (openRouterConfig.apiKey) {
+      return new OpenRouterProvider(openRouterConfig);
+    }
+    return null;
   }
 
   public getProviderName(): string {
@@ -39,7 +53,12 @@ export class LLMService {
 
   public async ping(): Promise<boolean> {
     try {
-      return await this.getActive().provider.ping();
+      const { provider } = this.getActive();
+      const primaryOk = await provider.ping();
+      if (primaryOk) return true;
+      const openRouter = this.getOpenRouterFallback();
+      if (openRouter) return await openRouter.ping();
+      return false;
     } catch {
       return false;
     }
@@ -49,6 +68,8 @@ export class LLMService {
     payload: ExercisePromptPayload
   ): Promise<GeneratedExerciseResult> {
     const { provider } = this.getActive();
+
+    // 1. Try Primary LLM Provider (Groq)
     try {
       const result = await provider.generateExercise(payload);
       if (result && result.question && result.answer) {
@@ -56,12 +77,31 @@ export class LLMService {
       }
     } catch (error) {
       console.warn(
-        `LLM provider (${provider.providerName}) unavailable or failed:`,
+        `Primary LLM provider (${provider.providerName}) unavailable or failed:`,
         error instanceof Error ? error.message : error
       );
     }
 
-    // Seamless zero-failure fallback
+    // 2. Try OpenRouter Fallback (NVIDIA Nemotron 3.5 Lightning)
+    if (provider.providerName !== "OPENROUTER") {
+      const openRouter = this.getOpenRouterFallback();
+      if (openRouter) {
+        try {
+          console.info("Failing over to OpenRouter (NVIDIA Nemotron 3.5 Lightning)...");
+          const orResult = await openRouter.generateExercise(payload);
+          if (orResult && orResult.question && orResult.answer) {
+            return orResult;
+          }
+        } catch (orError) {
+          console.warn(
+            "OpenRouter fallback provider failed:",
+            orError instanceof Error ? orError.message : orError
+          );
+        }
+      }
+    }
+
+    // 3. Seamless zero-failure deterministic fallback
     return generateFallbackExercise(payload);
   }
 }

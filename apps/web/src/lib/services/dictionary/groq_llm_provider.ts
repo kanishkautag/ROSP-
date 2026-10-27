@@ -11,7 +11,7 @@ export class GroqLLMDictionaryProvider implements IDictionaryProvider {
 
   isAvailable(): boolean {
     const config = getLLMConfig();
-    return Boolean(config.apiKey);
+    return Boolean(config.apiKey || config.openrouterApiKey);
   }
 
   supportsLanguage(): boolean {
@@ -20,7 +20,7 @@ export class GroqLLMDictionaryProvider implements IDictionaryProvider {
 
   async lookup(word: string, language?: string): Promise<DictionaryEntry | null> {
     const config = getLLMConfig();
-    if (!config.apiKey) return null;
+    if (!config.apiKey && !config.openrouterApiKey) return null;
 
     const query = word.trim().normalize("NFC");
     if (!query) return null;
@@ -44,32 +44,99 @@ Given any query, output a valid JSON object matching this schema exactly:
 }`;
 
     const userPrompt = `Define and look up: "${query}" in language "${targetLang}".`;
-    const modelsToTry = [config.model || "qwen/qwen3.8-27b", "openai/gpt-oss-20b"];
 
-    for (const model of modelsToTry) {
+    // 1. Try Groq models first if Groq API key is configured
+    if (config.apiKey) {
+      const modelsToTry = [config.model || "qwen/qwen3.8-27b", "openai/gpt-oss-20b"];
+
+      for (const model of modelsToTry) {
+        try {
+          const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${config.apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              response_format: { type: "json_object" },
+              temperature: 0.1,
+            }),
+            signal: AbortSignal.timeout(8000),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const rawJson = data.choices?.[0]?.message?.content || "";
+            if (rawJson) {
+              const parsed = JSON.parse(rawJson);
+              return {
+                word: parsed.word || query,
+                language: parsed.language || targetLang,
+                phonetic: parsed.phonetic || null,
+                partOfSpeech: parsed.partOfSpeech || "word",
+                meaning: parsed.meaning || "Definition found",
+                example: parsed.example || null,
+                cefrLevel: parsed.cefrLevel || "B1",
+                synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms.slice(0, 5) : [],
+                hindiTranslation: parsed.hindiTranslation || null,
+                mnemonic: parsed.mnemonic || null,
+                source: "Authoritative Lexicon Engine (Groq AI)",
+                sourceUrl: null,
+                license: "Open Educational Resource",
+                isLocal: false,
+                canPersist: true,
+              };
+            }
+          }
+        } catch (err: any) {
+          console.warn(`Groq dictionary lookup attempt with ${model} failed:`, err?.message);
+        }
+      }
+    }
+
+    // 2. Cascade to OpenRouter fallback (NVIDIA Nemotron 3.5 Lightning)
+    if (config.openrouterApiKey) {
       try {
-        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const orModel = config.openrouterModel || "nvidia/nemotron-3.5-lightning:free";
+        const orBaseUrl = config.openrouterBaseUrl || "https://openrouter.ai/api/v1";
+        const res = await fetch(`${orBaseUrl.replace(/\/+$/, "")}/chat/completions`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${config.apiKey}`,
+            Authorization: `Bearer ${config.openrouterApiKey}`,
+            "HTTP-Referer": process.env.NEXTAUTH_URL || "http://localhost:3000",
+            "X-Title": "ROSP Language Learning",
           },
           body: JSON.stringify({
-            model,
+            model: orModel,
             messages: [
-              { role: "system", content: systemPrompt },
+              { role: "system", content: `${systemPrompt}\nOutput ONLY valid raw JSON without markdown formatting.` },
               { role: "user", content: userPrompt },
             ],
-            response_format: { type: "json_object" },
             temperature: 0.1,
           }),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(12000),
         });
 
         if (res.ok) {
           const data = await res.json();
-          const rawJson = data.choices?.[0]?.message?.content || "";
+          let rawJson = data.choices?.[0]?.message?.content || "";
           if (rawJson) {
+            rawJson = rawJson.trim();
+            if (rawJson.startsWith("```")) {
+              rawJson = rawJson.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+            }
+            const firstBrace = rawJson.indexOf("{");
+            const lastBrace = rawJson.lastIndexOf("}");
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              rawJson = rawJson.substring(firstBrace, lastBrace + 1);
+            }
+
             const parsed = JSON.parse(rawJson);
             return {
               word: parsed.word || query,
@@ -82,7 +149,7 @@ Given any query, output a valid JSON object matching this schema exactly:
               synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms.slice(0, 5) : [],
               hindiTranslation: parsed.hindiTranslation || null,
               mnemonic: parsed.mnemonic || null,
-              source: "Authoritative Lexicon Engine (Groq AI)",
+              source: "Authoritative Lexicon Engine (OpenRouter AI)",
               sourceUrl: null,
               license: "Open Educational Resource",
               isLocal: false,
@@ -91,7 +158,7 @@ Given any query, output a valid JSON object matching this schema exactly:
           }
         }
       } catch (err: any) {
-        console.warn(`Groq dictionary lookup fallback attempt with ${model} failed:`, err?.message);
+        console.warn("OpenRouter dictionary lookup fallback failed:", err?.message);
       }
     }
 
