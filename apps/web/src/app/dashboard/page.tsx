@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import prisma from "@rosp/db";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { getDashboardStats } from "@/lib/services/user_service";
 import { DashboardClient } from "@/components/dashboard_client";
@@ -6,6 +8,16 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+
+  // Users who haven't completed onboarding are sent through it first
+  if (user) {
+    const profile = await prisma.user
+      .findUnique({ where: { id: user.id }, select: { onboardedAt: true } })
+      .catch(() => null);
+    if (profile && !profile.onboardedAt) {
+      redirect("/onboarding");
+    }
+  }
 
   const defaultStats = {
     wordsDueToday: 0,
@@ -22,6 +34,7 @@ export default async function DashboardPage() {
     retentionRate: 100,
     weakWords: [],
     recommendedWords: [],
+    targetLanguage: null,
   };
 
   const stats = user

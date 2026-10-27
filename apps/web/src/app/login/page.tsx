@@ -37,9 +37,10 @@ export default function LoginPage() {
         throw new Error(data.error || "Authentication failed");
       }
 
-      setSuccess(mode === "login" ? "Signed in successfully! Redirecting..." : "Account created! Redirecting...");
+      setSuccess(mode === "login" ? "Signed in successfully! Redirecting..." : "Account created! Let's set up your learning profile...");
+      const destination = mode === "register" || data.needsOnboarding ? "/onboarding" : "/dashboard";
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push(destination);
         router.refresh();
       }, 700);
     } catch (err: any) {

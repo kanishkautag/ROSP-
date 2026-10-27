@@ -13,6 +13,8 @@ interface VocabItem {
   id: string;
   word: string;
   meaning: string;
+  language?: string | null;
+  romanization?: string | null;
   partOfSpeech?: string | null;
   cefrLevel?: string | null;
 }
@@ -38,6 +40,7 @@ export default function WordListsPage() {
   // Add Word to List Modal
   const [addWordTargetList, setAddWordTargetList] = useState<ListItem | null>(null);
   const [addWordTab, setAddWordTab] = useState<"search" | "custom">("search");
+  const [addWordLanguage, setAddWordLanguage] = useState<string>("en");
   const [searchQuery, setSearchQuery] = useState("");
   const [catalogResults, setCatalogResults] = useState<VocabItem[]>([]);
   const [searchingCatalog, setSearchingCatalog] = useState(false);
@@ -46,6 +49,7 @@ export default function WordListsPage() {
   const [customExample, setCustomExample] = useState("");
   const [customPos, setCustomPos] = useState("noun");
   const [customCefr, setCustomCefr] = useState("B2");
+  const [customLanguage, setCustomLanguage] = useState("en");
   const [isSubmittingWord, setIsSubmittingWord] = useState(false);
 
   // Form states
@@ -71,7 +75,8 @@ export default function WordListsPage() {
     if (!searchQuery.trim()) return;
     setLookingUpOnline(true);
     try {
-      const res = await fetch(`/api/dictionary/lookup?query=${encodeURIComponent(searchQuery.trim())}`);
+      const langParam = addWordLanguage && addWordLanguage !== "ALL" ? `&language=${addWordLanguage}` : "";
+      const res = await fetch(`/api/dictionary/lookup?query=${encodeURIComponent(searchQuery.trim())}${langParam}`);
       const data = await res.json();
       if (res.ok && data.found && data.entry) {
         setCustomWord(data.entry.word);
@@ -79,6 +84,7 @@ export default function WordListsPage() {
         setCustomExample(data.entry.example || "");
         if (data.entry.partOfSpeech) setCustomPos(data.entry.partOfSpeech);
         if (data.entry.cefrLevel) setCustomCefr(data.entry.cefrLevel);
+        if (data.entry.language) setCustomLanguage(data.entry.language);
         setAddWordTab("custom");
       } else {
         setMessage({ text: data.message || "Word not found in open dictionary.", type: "error" });
@@ -90,7 +96,7 @@ export default function WordListsPage() {
     }
   };
 
-  const handleSearchCatalog = async (q: string) => {
+  const handleSearchCatalog = async (q: string, lang = addWordLanguage) => {
     setSearchQuery(q);
     if (!q.trim()) {
       setCatalogResults([]);
@@ -98,7 +104,8 @@ export default function WordListsPage() {
     }
     setSearchingCatalog(true);
     try {
-      const res = await fetch(`/api/words?query=${encodeURIComponent(q.trim())}`);
+      const langParam = lang && lang !== "ALL" ? `&language=${lang}` : "";
+      const res = await fetch(`/api/words?query=${encodeURIComponent(q.trim())}${langParam}`);
       if (res.ok) {
         const data = await res.json();
         setCatalogResults(data.words || []);
@@ -149,6 +156,7 @@ export default function WordListsPage() {
           example: customExample.trim() || undefined,
           partOfSpeech: customPos,
           cefrLevel: customCefr,
+          language: customLanguage,
         }),
       });
       if (res.ok) {
@@ -779,11 +787,48 @@ export default function WordListsPage() {
 
             {addWordTab === "search" ? (
               <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
+                {/* Language Filter Pills */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-white/5 text-xs">
+                  {[
+                    { id: "en", label: "English", flag: "🇬🇧" },
+                    { id: "hi", label: "Hindi (हिंदी)", flag: "🇮🇳" },
+                    { id: "mr", label: "Marathi (मराठी)", flag: "🇮🇳" },
+                    { id: "ALL", label: "All Languages", flag: "🌐" },
+                  ].map((lang) => (
+                    <button
+                      key={lang.id}
+                      type="button"
+                      onClick={() => {
+                        setAddWordLanguage(lang.id);
+                        if (searchQuery.trim()) {
+                          handleSearchCatalog(searchQuery, lang.id);
+                        }
+                      }}
+                      className={`flex-1 py-1.5 px-2 rounded-lg font-medium text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        addWordLanguage === lang.id
+                          ? "bg-indigo-600 text-white shadow-sm font-semibold"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                      }`}
+                    >
+                      <span>{lang.flag}</span>
+                      <span>{lang.label}</span>
+                    </button>
+                  ))}
+                </div>
+
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search dictionary (e.g. ephemeral, resilient)..."
+                    placeholder={`Search ${
+                      addWordLanguage === "en"
+                        ? "English dictionary (e.g. ephemeral, resilient)..."
+                        : addWordLanguage === "hi"
+                        ? "Hindi dictionary (हिंदी)..."
+                        : addWordLanguage === "mr"
+                        ? "Marathi dictionary (मराठी)..."
+                        : "all languages..."
+                    }`}
                     value={searchQuery}
                     onChange={(e) => handleSearchCatalog(e.target.value)}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 pl-9 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
@@ -803,6 +848,9 @@ export default function WordListsPage() {
                         <div className="max-w-[75%]">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-white text-sm">{word.word}</span>
+                            {word.romanization && (
+                              <span className="text-[11px] text-slate-400 italic">({word.romanization})</span>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -817,6 +865,9 @@ export default function WordListsPage() {
                             {word.partOfSpeech && (
                               <span className="text-[10px] text-slate-400">({word.partOfSpeech})</span>
                             )}
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 uppercase font-mono font-bold border border-white/5">
+                              {word.language}
+                            </span>
                             {word.cefrLevel && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-300 font-bold border border-indigo-500/20">
                                 {word.cefrLevel}
@@ -836,7 +887,7 @@ export default function WordListsPage() {
                     ))
                   ) : searchQuery.trim() ? (
                     <div className="text-center py-6 text-slate-400 text-xs space-y-3">
-                      <p>No matching words found in local catalog.</p>
+                      <p>No matching words found in local {addWordLanguage === "en" ? "English" : addWordLanguage === "hi" ? "Hindi" : addWordLanguage === "mr" ? "Marathi" : ""} catalog.</p>
                       <button
                         type="button"
                         onClick={handleLookupOnlineForList}
@@ -858,13 +909,37 @@ export default function WordListsPage() {
                     </div>
                   ) : (
                     <p className="text-xs text-slate-500 text-center py-6">
-                      Type above to search from thousands of GRE, TOEFL, IELTS & Oxford words.
+                      Type above to search from thousands of {addWordLanguage === "en" ? "English (Oxford/NGSL)" : addWordLanguage === "hi" ? "Hindi" : addWordLanguage === "mr" ? "Marathi" : ""} words.
                     </p>
                   )}
                 </div>
               </div>
             ) : (
               <form onSubmit={handleCreateCustomWordForList} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Language</label>
+                  <div className="flex gap-2">
+                    {[
+                      { id: "en", label: "English 🇬🇧" },
+                      { id: "hi", label: "Hindi 🇮🇳" },
+                      { id: "mr", label: "Marathi 🇮🇳" },
+                    ].map((l) => (
+                      <button
+                        type="button"
+                        key={l.id}
+                        onClick={() => setCustomLanguage(l.id)}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                          customLanguage === l.id
+                            ? "bg-indigo-600 border-indigo-500 text-white shadow-sm"
+                            : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">Word</label>

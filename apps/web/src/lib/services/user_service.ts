@@ -19,6 +19,8 @@ export interface RecommendedWordItem {
   example?: string | null;
   cefrLevel?: string | null;
   partOfSpeech?: string | null;
+  language?: string | null;
+  romanization?: string | null;
 }
 
 export interface DashboardStats {
@@ -36,6 +38,8 @@ export interface DashboardStats {
   retentionRate: number;
   weakWords: WeakWordItem[];
   recommendedWords: RecommendedWordItem[];
+  /** Language chosen during onboarding (null if not onboarded). */
+  targetLanguage: string | null;
 }
 
 export async function getUserProfile(userId: string) {
@@ -166,21 +170,44 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
     lastRating: uw.reviewAttempts[0]?.rating ?? null,
   }));
 
-  // Recommended words
-  const excludedIds = userWordVocabRecords.map((u) => u.vocabularyWordId);
-  let recommendedVocab = await prisma.vocabularyWord.findMany({
-    where: {
-      id: { notIn: excludedIds },
-    },
-    take: 6,
-    orderBy: { frequencyRank: "asc" },
+  // Recommended words: restricted to the onboarding target language,
+  // preferring the learner's CEFR level, then any level in that language.
+  const profile = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { targetLanguage: true, cefrLevel: true },
   });
+  const targetLanguage = profile?.targetLanguage ?? null;
+  const excludedIds = userWordVocabRecords.map((u) => u.vocabularyWordId);
+  const RECOMMEND_COUNT = 6;
 
-  if (recommendedVocab.length === 0) {
-    recommendedVocab = await prisma.vocabularyWord.findMany({
-      take: 6,
-      orderBy: { createdAt: "desc" },
+  const baseWhere = {
+    id: { notIn: excludedIds },
+    source: { notIn: ["user_personal_ephemeral"] },
+    ...(targetLanguage ? { language: targetLanguage } : {}),
+  };
+  const recommendOrder = [
+    { frequencyRank: { sort: "asc" as const, nulls: "last" as const } },
+    { word: "asc" as const },
+  ];
+
+  let recommendedVocab = profile?.cefrLevel
+    ? await prisma.vocabularyWord.findMany({
+        where: { ...baseWhere, cefrLevel: profile.cefrLevel },
+        take: RECOMMEND_COUNT,
+        orderBy: recommendOrder,
+      })
+    : [];
+
+  if (recommendedVocab.length < RECOMMEND_COUNT) {
+    const topUp = await prisma.vocabularyWord.findMany({
+      where: {
+        ...baseWhere,
+        id: { notIn: [...excludedIds, ...recommendedVocab.map((w) => w.id)] },
+      },
+      take: RECOMMEND_COUNT - recommendedVocab.length,
+      orderBy: recommendOrder,
     });
+    recommendedVocab = [...recommendedVocab, ...topUp];
   }
 
   const recommendedWords: RecommendedWordItem[] = recommendedVocab.map((w) => ({
@@ -190,6 +217,8 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
     example: w.example,
     cefrLevel: w.cefrLevel,
     partOfSpeech: w.partOfSpeech,
+    language: w.language,
+    romanization: w.romanization,
   }));
 
   return {
@@ -207,6 +236,7 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
     retentionRate,
     weakWords,
     recommendedWords,
+    targetLanguage,
   };
 }
 
@@ -257,12 +287,17 @@ export async function addWordToStudy(userId: string, vocabularyWordId: string) {
     },
   });
 
+  const prefs = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { preferredAlgorithm: true },
+  });
+
   await prisma.learningState.upsert({
     where: { userWordId: userWord.id },
     update: {},
     create: {
       userWordId: userWord.id,
-      algorithm: "SM2",
+      algorithm: prefs?.preferredAlgorithm ?? "SM2",
       repetitions: 0,
       interval: 1.0,
       easeFactor: 2.5,

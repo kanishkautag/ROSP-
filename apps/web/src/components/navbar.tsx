@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Brain, Sparkles, User as UserIcon } from "lucide-react";
+import { Brain, Sparkles, Settings2, User as UserIcon } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/auth";
 import { SignOutButton } from "./sign_out_button";
 
@@ -45,6 +45,15 @@ export async function Navbar() {
                   {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
                 </div>
                 <span>{user.name || user.email.split("@")[0]}</span>
+              </Link>
+              <Link
+                id="nav-preferences"
+                href="/onboarding"
+                title="Learning preferences"
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-300 bg-slate-900/60 border border-white/10 px-2.5 py-1.5 rounded-lg hover:border-indigo-500/40 hover:text-white transition-colors"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                <span className="hidden lg:inline">Preferences</span>
               </Link>
               <SignOutButton />
             </div>

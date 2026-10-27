@@ -31,6 +31,41 @@ export function DashboardClient({ userName, initialStats }: DashboardClientProps
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
+  // Interactive language switcher for recommendations
+  const [recLangFilter, setRecLangFilter] = useState<string>("auto");
+  const [recWords, setRecWords] = useState<RecommendedWordItem[]>(initialStats.recommendedWords);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+
+  const handleRecFilterChange = async (lang: string) => {
+    setRecLangFilter(lang);
+    if (lang === "auto") {
+      setRecWords(stats.recommendedWords);
+      return;
+    }
+    setLoadingRecs(true);
+    try {
+      const res = await fetch(`/api/words?language=${lang}&limit=6`);
+      if (res.ok) {
+        const data = await res.json();
+        const mapped: RecommendedWordItem[] = (data.words || []).map((w: any) => ({
+          id: w.id,
+          word: w.word,
+          meaning: w.meaning,
+          example: w.example,
+          cefrLevel: w.cefrLevel,
+          partOfSpeech: w.partOfSpeech,
+          language: w.language,
+          romanization: w.romanization,
+        }));
+        setRecWords(mapped);
+      }
+    } catch (e) {
+      console.error("Failed to fetch filtered recommendations:", e);
+    } finally {
+      setLoadingRecs(false);
+    }
+  };
+
   const dailyProgress = Math.min(
     100,
     Math.round((stats.reviewsCompletedToday / stats.dailyGoal) * 100)
@@ -379,7 +414,7 @@ export function DashboardClient({ userName, initialStats }: DashboardClientProps
         {/* Recommended Words Section */}
         <div className="glass-panel rounded-3xl p-6 bg-slate-900/60 border border-white/10 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
                   <Sparkles className="h-4 w-4" />
@@ -397,9 +432,44 @@ export function DashboardClient({ userName, initialStats }: DashboardClientProps
               </Link>
             </div>
 
-            {stats.recommendedWords.length > 0 ? (
-              <div className="space-y-3 mt-4">
-                {stats.recommendedWords.map((word) => {
+            {/* Language filter pills for recommendations */}
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-white/5 text-[11px] mb-3">
+              {[
+                {
+                  id: "auto",
+                  label:
+                    stats.targetLanguage === "hi"
+                      ? "🎯 Hindi (My Target)"
+                      : stats.targetLanguage === "mr"
+                      ? "🎯 Marathi (My Target)"
+                      : stats.targetLanguage === "en"
+                      ? "🎯 English (My Target)"
+                      : "🎯 My Target",
+                },
+                { id: "en", label: "🇬🇧 English" },
+                { id: "hi", label: "🇮🇳 Hindi" },
+                { id: "mr", label: "🇮🇳 Marathi" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleRecFilterChange(tab.id)}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                    recLangFilter === tab.id
+                      ? "bg-indigo-600 text-white shadow-sm font-semibold"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {loadingRecs ? (
+              <div className="text-center py-10 text-xs text-slate-400">Loading recommendations...</div>
+            ) : recWords.length > 0 ? (
+              <div className="space-y-3 mt-2">
+                {recWords.map((word) => {
                   const isAdded = addedIds.has(word.id);
                   const isAdding = addingId === word.id;
 
@@ -411,9 +481,17 @@ export function DashboardClient({ userName, initialStats }: DashboardClientProps
                       <div className="pr-3">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-white">{word.word}</span>
+                          {word.romanization && (
+                            <span className="text-[11px] text-slate-400 italic">({word.romanization})</span>
+                          )}
                           {word.cefrLevel && (
                             <span className="px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold">
                               {word.cefrLevel}
+                            </span>
+                          )}
+                          {word.language && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 uppercase font-mono font-bold">
+                              {word.language}
                             </span>
                           )}
                           {word.partOfSpeech && (

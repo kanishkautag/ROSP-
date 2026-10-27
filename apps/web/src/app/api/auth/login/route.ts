@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         name: user.name,
         image: user.image,
       },
+      needsOnboarding: !user.onboardedAt,
     });
 
     // Set HTTP-only session cookie

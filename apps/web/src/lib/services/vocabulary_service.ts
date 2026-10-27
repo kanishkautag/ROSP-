@@ -27,7 +27,7 @@ export async function searchVocabularyWords(params: VocabularyWordQueryParams) {
     },
   };
 
-  const [words, total] = await Promise.all([
+  const [rawWords, total] = await Promise.all([
     prisma.vocabularyWord.findMany({
       where,
       skip,
@@ -36,6 +36,29 @@ export async function searchVocabularyWords(params: VocabularyWordQueryParams) {
     }),
     prisma.vocabularyWord.count({ where }),
   ]);
+
+  // When searching by query, sort results so exact/prefix word matches rank above meaning substring matches
+  let words = rawWords;
+  if (normalizedQuery) {
+    const qLower = normalizedQuery.toLowerCase();
+    words = [...rawWords].sort((a, b) => {
+      const aWord = a.word.toLowerCase();
+      const bWord = b.word.toLowerCase();
+
+      const getScore = (w: typeof a, wordLower: string) => {
+        if (wordLower === qLower) return 0;
+        if (wordLower.startsWith(qLower)) return 1;
+        if (wordLower.includes(qLower)) return 2;
+        if (w.romanization && w.romanization.toLowerCase().startsWith(qLower)) return 3;
+        return 4;
+      };
+
+      const scoreA = getScore(a, aWord);
+      const scoreB = getScore(b, bWord);
+      if (scoreA !== scoreB) return scoreA - scoreB;
+      return aWord.localeCompare(bWord);
+    });
+  }
 
   return {
     words,
